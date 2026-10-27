@@ -4,7 +4,7 @@
  */
 import { Capacitor } from '@capacitor/core';
 import { Preferences } from '@capacitor/preferences';
-import { GENS, UPS, ACHS, MISSION_TYPES } from './data.js';
+import { GENS, UPS, ACHS, MISSION_TYPES, GRANTED_KEEP } from './data.js';
 import { fresh } from './logic.js';
 
 export const SAVE_KEY = 'oredrift.v1';
@@ -34,6 +34,13 @@ export function parseSave(raw, now = Date.now()) {
   S.last = Math.min(num(d.last, now), now);
   S.sound = d.sound !== false;
   S.notify = d.notify === true;
+  S.podReadyAt = Math.min(num(d.podReadyAt, 0), now + 10 * 60 * 1000); // never more than one cooldown ahead
+
+  const iap = isObj(d.iap) ? d.iap : {};
+  S.iap = { removeAds: iap.removeAds === true, starter: iap.starter === true, boost: iap.boost === true };
+  S.granted = Array.isArray(d.granted)
+    ? d.granted.filter((x) => typeof x === 'string' && x.length > 0 && x.length < 200).slice(0, GRANTED_KEEP)
+    : [];
 
   const owned = isObj(d.owned) ? d.owned : {};
   for (const g of GENS) { const n = int(owned[g.id], 0); if (n > 0) S.owned[g.id] = n; }

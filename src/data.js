@@ -74,3 +74,20 @@ export const ACHS = [
   { id: 'p2', name: 'Roaring', desc: 'Reach 10,000 t/s.', t: 1e4, stat: 'rate' },
   { id: 'p3', name: 'Unstoppable', desc: 'Reach 1 million t/s.', t: 1e6, stat: 'rate' },
 ];
+
+/*
+ * Shop. `id` is the product ID to create in Play Console (one-time products).
+ * kind 'pack' is repeatable (consumed after it is granted); kind 'once' is bought a single time and restorable.
+ * Ore rewards are hours of the player's current no-frenzy output, with a floor so early players still get something.
+ * No random rewards: everything is shown before purchase.
+ */
+export const BOOST_MULT = 1.25;
+export const PRODUCTS = [
+  { id: 'remove_ads', kind: 'once', name: 'Remove ads', desc: 'Removes the banner ad. The ad bonuses (double offline earnings, cargo pod) become free.' },
+  { id: 'starter_bundle', kind: 'once', name: 'Starter bundle', desc: '3 hours of ore and output x7 for 2 minutes. One time only.', hours: 3, floor: 10000, frenzy: 120 },
+  { id: 'boost_25', kind: 'once', name: 'Prospector boost', desc: 'Permanent +25% to all output and taps. Stays through relocations.' },
+  { id: 'ore_small', kind: 'pack', name: 'Small ore pack', desc: '1 hour of your current output.', hours: 1, floor: 2000 },
+  { id: 'ore_medium', kind: 'pack', name: 'Medium ore pack', desc: '6 hours of your current output.', hours: 6, floor: 15000 },
+  { id: 'ore_large', kind: 'pack', name: 'Large ore pack', desc: '24 hours of your current output.', hours: 24, floor: 80000 },
+];
+export const GRANTED_KEEP = 50;

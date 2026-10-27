@@ -6,6 +6,7 @@
 import {
   GENS, UPS, ACHS, MILESTONES, GROWTH, OFFLINE_CAP, OFFLINE_RATE, PRESTIGE_BASE,
   FRENZY_MULT, FRENZY_MAX_MS, ACH_BONUS, SURVEY_BONUS, MAX_BUY, MISSION_TYPES, TAP_TARGETS,
+  PRODUCTS, BOOST_MULT, GRANTED_KEEP,
 } from './data.js';
 
 /* ---------- random ---------- */
@@ -54,7 +55,8 @@ export function fresh(now = 0) {
     ore: 0, total: 0, allTime: 0, taps: 0, points: 0, runs: 0,
     owned: {}, ups: {}, last: now, sound: true, ach: {},
     stats: { comets: 0, missions: 0, best: 0 },
-    streak: 0, lastSupply: '', daily: null, frenzyUntil: 0, notify: false,
+    streak: 0, lastSupply: '', daily: null, frenzyUntil: 0, notify: false, podReadyAt: 0,
+    iap: { removeAds: false, starter: false, boost: false }, granted: [],
   };
 }
 
@@ -69,11 +71,14 @@ export function milestoneMult(n) {
 export const surveyMult = (S) => 1 + SURVEY_BONUS * S.points;
 export const achCount = (S) => ACHS.reduce((a, x) => a + (S.ach[x.id] ? 1 : 0), 0);
 export const achMult = (S) => 1 + ACH_BONUS * achCount(S);
+/** One-time shop boost: x1.25 to all output and taps. */
+export const iapMult = (S) => (S.iap && S.iap.boost ? BOOST_MULT : 1);
+export const adsRemoved = (S) => !!(S.iap && S.iap.removeAds);
 
 export function prodMult(S) {
   let m = 1;
   for (const u of UPS) if (S.ups[u.id] && u.prod) m *= u.prod;
-  return m * surveyMult(S) * achMult(S);
+  return m * surveyMult(S) * achMult(S) * iapMult(S);
 }
 
 export const frenzyOn = (S, now) => now < S.frenzyUntil;
@@ -103,7 +108,7 @@ export function tapValue(S, now, o) {
     if (u.tap) m *= u.tap;
     if (u.link) l += u.link;
   }
-  return m * surveyMult(S) * achMult(S) * (frenzyOn(S, now) ? FRENZY_MULT : 1) + o * l;
+  return m * surveyMult(S) * achMult(S) * iapMult(S) * (frenzyOn(S, now) ? FRENZY_MULT : 1) + o * l;
 }
 
 /* ---------- buying ---------- */
@@ -343,4 +348,70 @@ export function catchCometReward(S, now, rand1) {
   const g = minutesOfOre(S, 13, 300);
   gain(S, g, true);
   return { kind: 'pod', gain: g };
+}
+
+/* ---------- rewarded ad: cargo pod ---------- */
+export const POD_MINUTES = 13;
+export const POD_COOLDOWN_MS = 10 * 60 * 1000;
+/** Ore in a cargo pod: 13 minutes of no-frenzy output, at least 300 t (same as the comet pod). */
+export const podReward = (S) => minutesOfOre(S, POD_MINUTES, 300);
+/** Milliseconds until the next pod may be requested (0 = ready). */
+export const podWaitMs = (S, now) => Math.max(0, S.podReadyAt - now);
+
+/** Call after the ad was watched. Mutates S. Returns the ore paid, or 0 if still cooling down. */
+export function claimPod(S, now) {
+  if (podWaitMs(S, now) > 0) return 0;
+  const g = podReward(S);
+  gain(S, g, true);
+  S.podReadyAt = now + POD_COOLDOWN_MS;
+  return g;
+}
+
+/* ---------- shop ---------- */
+export const productById = (id) => PRODUCTS.find((p) => p.id === id);
+
+/** Ore a pack or bundle pays right now. */
+export const productOre = (S, p) => (p.hours ? minutesOfOre(S, p.hours * 60, p.floor) : 0);
+
+/** True when a one-time product is already owned (a pack is never "owned"). */
+export function owns(S, id) {
+  if (id === 'remove_ads') return !!S.iap.removeAds;
+  if (id === 'starter_bundle') return !!S.iap.starter;
+  if (id === 'boost_25') return !!S.iap.boost;
+  return false;
+}
+
+/**
+ * Applies a completed purchase. Mutates S.
+ * `orderId` makes it safe to call twice for the same purchase (a pack is granted once per order).
+ * Returns { ok, ore, frenzy, restored } where restored means nothing new was paid.
+ */
+export function applyPurchase(S, productId, orderId, now) {
+  const p = productById(productId);
+  if (!p) return { ok: false, ore: 0, frenzy: 0, restored: false };
+  if (p.kind === 'pack') {
+    if (orderId && S.granted.includes(orderId)) return { ok: true, ore: 0, frenzy: 0, restored: true };
+    const ore = productOre(S, p);
+    gain(S, ore, true);
+    if (orderId) { S.granted.unshift(orderId); S.granted.length = Math.min(S.granted.length, GRANTED_KEEP); }
+    return { ok: true, ore, frenzy: 0, restored: false };
+  }
+  if (owns(S, productId)) return { ok: true, ore: 0, frenzy: 0, restored: true };
+  if (productId === 'remove_ads') S.iap.removeAds = true;
+  else if (productId === 'boost_25') S.iap.boost = true;
+  else if (productId === 'starter_bundle') {
+    S.iap.starter = true;
+    const ore = productOre(S, p);
+    gain(S, ore, true);
+    startFrenzy(S, now, p.frenzy);
+    return { ok: true, ore, frenzy: p.frenzy, restored: false };
+  }
+  return { ok: true, ore: 0, frenzy: 0, restored: false };
+}
+
+/** Marks a one-time product as owned without paying anything (Play says the player already bought it). */
+export function restoreOwned(S, productId) {
+  if (productId === 'remove_ads') S.iap.removeAds = true;
+  else if (productId === 'boost_25') S.iap.boost = true;
+  else if (productId === 'starter_bundle') S.iap.starter = true;
 }

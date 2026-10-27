@@ -1,5 +1,5 @@
 /* DOM building and updating: HUD, tabs, cards, goals, toasts. Reads state, never changes rules. */
-import { GENS, UPS, ACHS, MILESTONES, FRENZY_MULT, ACH_BONUS } from './data.js';
+import { GENS, UPS, ACHS, MILESTONES, FRENZY_MULT, ACH_BONUS, PRODUCTS } from './data.js';
 import * as L from './logic.js';
 
 const $ = (id) => document.getElementById(id);
@@ -7,7 +7,9 @@ const setText = (el, s) => { if (el.textContent !== s) el.textContent = s; };
 
 /**
  * h: { getState(), onBuy(gen, mode), onBuyUp(up), onClaimMission(i), onClaimChest(), onClaimSupply(),
- *      onRelocate(), onWipe(), onToggleSound(), onToggleNotify?(), version? }
+ *      onRelocate(), onWipe(), onToggleSound(), onToggleNotify?(), version?,
+ *      podInfo(now) -> null | { reward, waitMs, free }, onWatchPod(), onOpenAdPrivacy?(),
+ *      priceOf(id), onBuyProduct(product), onRestore(), isBusy() }
  */
 export function createUI(h) {
   let buyMode = 1;
@@ -212,6 +214,56 @@ export function createUI(h) {
   }
   const resetAchList = () => { achKey = -1; };
 
+  /* ---------- cargo pod (rewarded ad) ---------- */
+  function updatePod(s, date) {
+    const info = h.podInfo(date.getTime()), sect = $('pod-sect');
+    sect.hidden = !info;
+    if (!info) return;
+    const ready = info.waitMs <= 0;
+    setText($('pod-note'), ready
+      ? (info.free ? 'Free bonus, thanks to removing ads.' : 'Watch a short ad. Optional.')
+      : 'Next cargo pod in ' + L.fmtDur(Math.ceil(info.waitMs / 1000)) + '.');
+    setBtn({ btn: $('pod-btn'), bn: $('pod-bn'), bc: $('pod-bc') }, ready, ready ? (info.free ? 'Collect' : 'Watch ad') : 'Wait', ready ? '+' + L.fmt(info.reward) : '');
+  }
+
+  /* ---------- shop ---------- */
+  const shopEls = {};
+  function buildShop() {
+    const host = $('shop'); host.textContent = '';
+    PRODUCTS.forEach((p) => {
+      const el = document.createElement('article'); el.className = 'card up';
+      el.innerHTML = '<div class="info"><h3 class="name"></h3><p class="desc"></p><p class="meta"></p></div><button class="buy" type="button"><span class="bn"></span><span class="bc"></span></button>';
+      el.querySelector('.name').textContent = p.name; el.querySelector('.desc').textContent = p.desc;
+      const c = { meta: el.querySelector('.meta'), btn: el.querySelector('.buy'), bn: el.querySelector('.bn'), bc: el.querySelector('.bc') };
+      c.btn.addEventListener('click', () => h.onBuyProduct(p));
+      host.appendChild(el); shopEls[p.id] = c;
+    });
+    $('restore').addEventListener('click', () => h.onRestore());
+  }
+  function updateShop(s) {
+    $('shop-note').hidden = PRODUCTS.some((p) => h.priceOf(p.id));
+    PRODUCTS.forEach((p) => {
+      const c = shopEls[p.id], owned = L.owns(s, p.id), price = h.priceOf(p.id);
+      setText(c.meta, owned ? 'Owned' : p.hours ? 'Pays about ' + L.fmt(L.productOre(s, p)) + ' t at your current output' : '');
+      if (owned) setBtn(c, false, 'Owned', '');
+      else if (!price) setBtn(c, false, 'Unavailable', '');
+      else setBtn(c, !h.isBusy(), 'Buy', price);
+    });
+  }
+  function setShopVisible(on) {
+    $('nav-shop').hidden = !on;
+    if (!on && activeTab === 'shop') selectTab('fleet');
+  }
+
+  /* ---------- offer banner (e.g. double offline earnings) ---------- */
+  let offerGo = null;
+  function showOffer(text, button, onGo) {
+    offerGo = onGo;
+    setText($('offer-text'), text); setText($('offer-go'), button);
+    $('offer').hidden = false;
+  }
+  const hideOffer = () => { $('offer').hidden = true; offerGo = null; };
+
   /* ---------- HUD and whole-screen refresh ---------- */
   let lastOre = '';
   function updateOre(s) {
@@ -222,13 +274,14 @@ export function createUI(h) {
     const s = S();
     const o = L.ops(s, now);
     setText($('rate'), '+' + L.fmt(o) + ' t/s'); setText($('tapv'), 'tap +' + L.fmt(L.tapValue(s, now, o)));
-    const b = $('bonus'), bp = Math.round((L.surveyMult(s) * L.achMult(s) - 1) * 100);
+    const b = $('bonus'), bp = Math.round((L.surveyMult(s) * L.achMult(s) * L.iapMult(s) - 1) * 100);
     if (bp > 0) { b.hidden = false; setText(b, '+' + bp + '% bonus'); } else b.hidden = true;
     const fz = $('frenzy');
     if (L.frenzyOn(s, now)) { fz.hidden = false; setText(fz, '×' + FRENZY_MULT + ' for ' + Math.ceil(L.frenzyLeft(s, now)) + 's'); } else fz.hidden = true;
     updateOre(s);
-    updateFleet(s); updateUps(s);
+    updateFleet(s); updatePod(s, date); updateUps(s);
     if (activeTab === 'goals') updateGoals(s, date);
+    if (activeTab === 'shop') updateShop(s);
     updateBelt(s);
     $('b-ups').hidden = !L.visibleUps(s).some((u) => s.ore >= u.cost);
     $('b-goals').hidden = !L.goalsReady(s, date);
@@ -236,7 +289,7 @@ export function createUI(h) {
   }
 
   /* ---------- tabs and controls ---------- */
-  const TABS = ['fleet', 'ups', 'goals', 'belt'];
+  const TABS = ['fleet', 'ups', 'goals', 'shop', 'belt'];
   function selectTab(name) {
     activeTab = name;
     document.querySelectorAll('.nav button').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tab === name)));
@@ -251,7 +304,7 @@ export function createUI(h) {
   }
 
   function init() {
-    buildFleet(); buildGoals();
+    buildFleet(); buildGoals(); buildShop();
     document.querySelectorAll('#seg button').forEach((b) => b.addEventListener('click', () => {
       buyMode = b.dataset.m === 'max' ? 'max' : +b.dataset.m;
       document.querySelectorAll('#seg button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
@@ -263,11 +316,15 @@ export function createUI(h) {
     $('snd').addEventListener('click', h.onToggleSound);
     $('toast').addEventListener('click', nextToast);
     if (h.version) setText($('version'), h.version);
+    $('pod-btn').addEventListener('click', () => h.onWatchPod());
+    $('offer-go').addEventListener('click', () => { if (offerGo) offerGo(); });
+    $('offer-x').addEventListener('click', hideOffer);
+    if (h.onOpenAdPrivacy) $('adprivacy').addEventListener('click', h.onOpenAdPrivacy);
     if (h.onToggleNotify) { $('notify-row').hidden = false; $('notify').addEventListener('click', h.onToggleNotify); }
   }
 
   return {
-    init, update, updateOre, toast, selectTab, resetUpgradeList, resetAchList,
+    init, update, updateOre, toast, showOffer, hideOffer, setShopVisible, setAdPrivacy: (on) => { $('adprivacy-row').hidden = !on; }, selectTab, resetUpgradeList, resetAchList,
     activeTab: () => activeTab,
   };
 }

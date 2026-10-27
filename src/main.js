@@ -14,6 +14,8 @@ import { createUI } from './ui.js';
 import { sounds, setSoundEnabled } from './audio.js';
 import { loadState, saveState } from './storage.js';
 import * as native from './native.js';
+import * as ads from './ads.js';
+import * as store from './store.js';
 
 /* Hosted privacy policy (GitHub Pages, from docs/). The Settings link only shows when this is non-empty. */
 const PRIVACY_URL = 'https://al-creado.github.io/OreDrift/';
@@ -34,6 +36,35 @@ function offline(sec) {
   const r = L.applyOffline(S, sec);
   if (!r) return;
   ui.toast('Away ' + L.fmtDur(sec) + '. Your fleet mined +' + L.fmt(r.gain) + ' t at half rate' + (r.capped ? ' (capped at 8 h).' : '.'), 9000);
+  offerDouble(r.gain);
+}
+
+/* Rewarded bonuses. With ads removed they are simply free; otherwise the player opts in to watch an ad. */
+const rewardsOpen = () => L.adsRemoved(S) || ads.adsAvailable();
+const getReward = () => (L.adsRemoved(S) ? Promise.resolve('rewarded') : ads.showRewarded());
+
+/* Optional bonus: pays the offline earnings a second time. Nothing happens unless the player taps the button. */
+let pendingDouble = 0; // offline earnings seen before ads finished starting
+function offerDouble(amount) {
+  if (!rewardsOpen()) { pendingDouble = amount; return; }
+  pendingDouble = 0;
+  const free = L.adsRemoved(S);
+  ui.showOffer('Double your offline earnings?', (free ? 'Claim +' : 'Watch ad +') + L.fmt(amount), async () => {
+    ui.hideOffer();
+    const res = await getReward();
+    if (res === 'rewarded') {
+      L.gain(S, amount);
+      ui.toast('Bonus! +' + L.fmt(amount) + ' t.', 3500);
+      sounds.claim();
+      refresh(); save();
+    } else if (res === 'closed') {
+      ui.toast('The ad was closed before it finished, so no bonus.', 3500);
+      offerDouble(amount);
+    } else {
+      ui.toast('No ad available right now. Try again in a moment.', 3500);
+      offerDouble(amount);
+    }
+  });
 }
 
 function tick(now) {
@@ -109,6 +140,7 @@ function onWipe() {
   L.ensureDaily(S, new Date());
   refresh(); save();
   ui.toast('Save wiped. Fresh belt.');
+  syncPurchases(false); // purchases live with the Google account, so bring owned items (Remove ads, boost) straight back
 }
 
 function onClaimMission(i) {
@@ -135,6 +167,77 @@ function onClaimSupply() {
   refresh(); save();
 }
 
+const podInfo = (now) => (rewardsOpen() ? { reward: L.podReward(S), waitMs: L.podWaitMs(S, now), free: L.adsRemoved(S) } : null);
+
+async function onWatchPod() {
+  if (!rewardsOpen() || L.podWaitMs(S, Date.now()) > 0) return;
+  const res = await getReward();
+  if (res === 'rewarded') {
+    const g = L.claimPod(S, Date.now());
+    if (g) ui.toast('Cargo pod! +' + L.fmt(g) + ' t.', 3500);
+    sounds.comet();
+    refresh(); save();
+  } else if (res === 'closed') {
+    ui.toast('The ad was closed before it finished, so no pod.', 3500);
+  } else {
+    ui.toast('No ad available right now. Try again in a moment.', 3500);
+  }
+}
+
+/* ---------- shop ---------- */
+let purchasing = false;
+
+function announce(p, r) {
+  if (r.restored) ui.toast(p.name + ' is already yours. Restored.', 3500);
+  else if (p.id === 'remove_ads') ui.toast('Ads removed. Thank you! The ad bonuses are now free.', 4500);
+  else if (p.id === 'starter_bundle') ui.toast('Starter bundle! +' + L.fmt(r.ore) + ' t and output ×' + FRENZY_MULT + ' for ' + r.frenzy + ' s.', 4500);
+  else if (p.id === 'boost_25') ui.toast('Prospector boost active: +25% to all output and taps.', 4500);
+  else ui.toast(p.name + ': +' + L.fmt(r.ore) + ' t delivered.', 4000);
+  if (!r.restored) sounds.chest();
+}
+
+async function onBuyProduct(p) {
+  if (purchasing) return;
+  purchasing = true; refresh();
+  try {
+    const res = await store.purchase(p);
+    if (res.status === 'cancelled') return;
+    if (res.status !== 'purchased') {
+      ui.toast('The purchase did not complete. If you were charged, tap Restore purchases.', 5000);
+      return;
+    }
+    const r = L.applyPurchase(S, res.productId, res.orderId, Date.now());
+    await save(); // persist the reward before telling Play the pack is used up
+    if (p.kind === 'pack') await store.finishPack(res.token);
+    if (p.id === 'remove_ads' && !r.restored) { ads.hideBanner(); }
+    announce(p, r);
+  } finally {
+    purchasing = false; refresh();
+  }
+}
+
+/** Reconciles with Google Play: restores owned one-time items and delivers packs that were paid for but not yet granted. */
+async function syncPurchases(manual) {
+  const held = await store.ownedPurchases();
+  let news = 0;
+  for (const o of held) {
+    const p = L.productById(o.productId);
+    if (!p) continue;
+    if (p.kind === 'pack') {
+      const r = L.applyPurchase(S, p.id, o.orderId, Date.now());
+      await save();
+      await store.finishPack(o.token);
+      if (!r.restored) { announce(p, r); news++; }
+    } else if (!L.owns(S, p.id)) {
+      L.restoreOwned(S, p.id);
+      if (p.id === 'remove_ads') ads.hideBanner();
+      news++;
+    }
+  }
+  if (news) { await save(); refresh(); }
+  if (manual) ui.toast(news ? 'Purchases restored.' : 'Nothing new to restore.', 3500);
+}
+
 function onToggleSound() { S.sound = !S.sound; refresh(); save(); }
 
 async function onToggleNotify() {
@@ -143,7 +246,7 @@ async function onToggleNotify() {
     native.cancelReminders();
   } else if (await native.requestNotifyPermission()) {
     S.notify = true;
-    ui.toast('Reminders on. You will hear about supply drops and a full hold.');
+    ui.toast('Reminders on. You will hear about supply drops, a full hold and a ready cargo pod.');
   } else {
     ui.toast('Notifications are not allowed. Turn them on in system settings first.', 4500);
   }
@@ -156,16 +259,19 @@ function onHide() {
   const now = Date.now();
   S.last = now;
   save();
-  if (S.notify) native.scheduleReminders(now, L.fleetCount(S) > 0);
+  if (S.notify) {
+    const podAt = rewardsOpen() && L.podWaitMs(S, now) > 0 ? S.podReadyAt : 0; // only remind while the pod is cooling down
+    native.scheduleReminders(now, L.fleetCount(S) > 0, podAt);
+  }
 }
 
 function onShow() {
   const now = Date.now();
-  const away = (now - S.last) / 1000;
   paused = false;
-  lastT = now;
   native.cancelReminders();
-  if (away > 60) offline(away);
+  lastT = S.last;
+  tick(now); // under a minute away earns at full rate, longer earns offline rate (same as the reference)
+  prevDraw = now;
   refresh();
   requestAnimationFrame(frame);
 }
@@ -194,6 +300,9 @@ async function boot() {
     onBuy, onBuyUp, onClaimMission, onClaimChest, onClaimSupply, onRelocate, onWipe, onToggleSound,
     onToggleNotify: native.isNative() ? onToggleNotify : null,
     onRefresh: refresh,
+    podInfo, onWatchPod,
+    priceOf: store.priceOf, onBuyProduct, onRestore: () => syncPurchases(true), isBusy: () => purchasing,
+    onOpenAdPrivacy: native.isNative() ? () => ads.openPrivacyOptions() : null,
     version: 'Version ' + __APP_VERSION__,
   });
   ui.init();
@@ -204,6 +313,8 @@ async function boot() {
     reduced: REDUCED,
     frenzyOn: () => L.frenzyOn(S, Date.now()),
     shipCount: () => L.fleetCount(S),
+    onCometSpawn: () => sounds.cometSpawn(),
+    onCometPing: () => sounds.cometPing(),
   });
   cv.addEventListener('pointerdown', (e) => {
     e.preventDefault();
@@ -231,6 +342,20 @@ async function boot() {
   L.ensureDaily(S, new Date(now));
   if (L.canSupply(S, new Date(now))) ui.toast('Your daily supply drop is ready on the Goals tab.', 4500);
   refresh();
+
+  // Store first (it can restore "Remove ads" on a new phone), then ads. None of this blocks play; failure just hides the buttons.
+  (async () => {
+    await store.initStore();
+    ui.setShopVisible(store.storeAvailable() || native.isNative()); // on Android always show it; items read "Unavailable" until Play has them
+    await syncPurchases(false);
+    if (!L.adsRemoved(S)) {
+      await ads.initAds();
+      if (!L.adsRemoved(S)) await ads.showBanner();
+      ui.setAdPrivacy(ads.needsPrivacyOptions());
+    }
+    if (pendingDouble) offerDouble(pendingDouble);
+    refresh();
+  })();
 
   setInterval(() => { if (!paused) refresh(); }, 250);
   setInterval(() => { if (!paused) save(); }, SAVE_EVERY_MS);

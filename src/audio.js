@@ -48,5 +48,8 @@ export const sounds = {
   chest: () => chime([[392, 0.15, 0.05, 0], [587, 0.15, 0.05, 90], [880, 0.25, 0.05, 180]]),
   supply: () => chime([[440, 0.12, 0.05, 0], [660, 0.18, 0.05, 90]]),
   comet: () => chime([[700, 0.1, 0.06, 0], [1050, 0.2, 0.06, 70]]),
+  // A comet has appeared: a short rising three-note chime, then a soft ping every second or so while it is on screen.
+  cometSpawn: () => chime([[880, 0.14, 0.05, 0], [1175, 0.14, 0.05, 120], [1568, 0.24, 0.05, 240]], 'sine'),
+  cometPing: () => blip(1568, 0.09, 0.03, 'sine'),
   achievement: () => chime([[600, 0.12, 0.05, 0], [900, 0.2, 0.05, 100]]),
 };

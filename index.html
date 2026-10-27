@@ -18,6 +18,11 @@
       <section class="stage">
         <canvas id="cv" tabindex="0" role="img" aria-label="Asteroid. Tap it, or press space, to mine ore. Press C to catch a passing comet."></canvas>
         <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+        <div class="offer" id="offer" hidden>
+          <span id="offer-text"></span>
+          <button class="btn primary" id="offer-go" type="button"></button>
+          <button class="x" id="offer-x" type="button" aria-label="Dismiss">✕</button>
+        </div>
       </section>
 
       <main class="panes">
@@ -30,6 +35,12 @@
               <button type="button" data-m="max" aria-pressed="false">Max</button>
             </div>
           </div></div>
+          <div class="in pod-wrap" id="pod-sect" hidden>
+            <article class="card up">
+              <div class="info"><h3 class="name">Cargo pod</h3><p class="desc" id="pod-note"></p></div>
+              <button class="buy" id="pod-btn" type="button"><span class="bn" id="pod-bn"></span><span class="bc" id="pod-bc"></span></button>
+            </article>
+          </div>
           <div class="in list" id="fleet"></div>
         </section>
 
@@ -53,6 +64,17 @@
               <div class="row"><h2>Commendations</h2><span class="pts" id="achcount">0</span></div>
               <p class="note" id="achnote"></p>
               <div class="alist" id="achs"></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="scroll" id="tab-shop" role="tabpanel" aria-label="Shop" hidden>
+          <div class="in list">
+            <p class="note" id="shop-note" hidden>Purchases are not available right now. They work once the app is installed from Google Play and the items are set up there.</p>
+            <div class="mlist" id="shop"></div>
+            <div class="sect">
+              <p class="note">Purchases are handled by Google Play. Items you bought before can be restored on any phone with the same Google account.</p>
+              <button class="btn" id="restore" type="button">Restore purchases</button>
             </div>
           </div>
         </section>
@@ -84,9 +106,13 @@
               <h2>Settings</h2>
               <div class="row"><span>Sound</span><button class="btn" id="snd" type="button" aria-pressed="true">On</button></div>
               <div id="notify-row" class="row" hidden><span>Reminders</span><button class="btn" id="notify" type="button" aria-pressed="false">Off</button></div>
+              <div id="adprivacy-row" class="row" hidden><span>Ad privacy choices</span><button class="btn" id="adprivacy" type="button">Open</button></div>
               <button class="btn danger" id="wipe" type="button">Wipe save</button>
               <p class="note">Progress is saved on this device only.</p>
-              <p class="note"><span id="version"></span> <a id="privacy" href="#" target="_blank" rel="noopener" hidden>Privacy policy</a></p>
+              <div class="legal">
+                <a id="privacy" href="#" target="_blank" rel="noopener" hidden>Privacy policy</a>
+                <span id="version"></span>
+              </div>
             </div>
           </div>
         </section>
@@ -96,6 +122,7 @@
         <button type="button" role="tab" aria-selected="true" data-tab="fleet">Fleet</button>
         <button type="button" role="tab" aria-selected="false" data-tab="ups">Upgrades<span class="badge" id="b-ups" hidden></span></button>
         <button type="button" role="tab" aria-selected="false" data-tab="goals">Goals<span class="badge" id="b-goals" hidden></span></button>
+        <button type="button" role="tab" aria-selected="false" data-tab="shop" id="nav-shop" hidden>Shop</button>
         <button type="button" role="tab" aria-selected="false" data-tab="belt">Belt<span class="badge" id="b-belt" hidden></span></button>
       </nav>
     </div>

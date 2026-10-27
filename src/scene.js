@@ -5,9 +5,10 @@ const MONO = "'IBM Plex Mono', ui-monospace, Menlo, monospace";
 const TAU = Math.PI * 2;
 const COMET_LIFE = 8;
 const COMET_HIT_PX = 44;
+const COMET_PING_S = 1.6;
 
 /**
- * hooks: { reduced: bool, frenzyOn(): bool, shipCount(): number }
+ * hooks: { reduced: bool, frenzyOn(): bool, shipCount(): number, onCometSpawn?(), onCometPing?() }
  * Returns the scene controller.
  */
 export function createScene(cv, hooks) {
@@ -20,7 +21,7 @@ export function createScene(cv, hooks) {
 
   let W = 0, H = 0, DPR = 1;
   let rot = 0, pulse = 0, glow = 0.12, tClock = 0;
-  let comet = null, nextComet = 0;
+  let comet = null, nextComet = 0, pingT = 0;
   const fx = { chips: [], texts: [] };
 
   /* ---- fixed shapes (seeded, so the asteroid looks the same every launch) ---- */
@@ -80,10 +81,16 @@ export function createScene(cv, hooks) {
   }
   function updateComet(dt, now) {
     if (!comet) {
-      if (W && now >= nextComet) comet = { t: 0, life: COMET_LIFE, dir: Math.random() < 0.5 ? 1 : -1, ph: Math.random() * TAU };
+      if (W && now >= nextComet) {
+        comet = { t: 0, life: COMET_LIFE, dir: Math.random() < 0.5 ? 1 : -1, ph: Math.random() * TAU };
+        pingT = 0;
+        if (hooks.onCometSpawn) hooks.onCometSpawn();
+      }
       return;
     }
     comet.t += dt;
+    pingT += dt;
+    if (pingT >= COMET_PING_S) { pingT = 0; if (hooks.onCometPing) hooks.onCometPing(); } // audio clue while it is on screen
     if (comet.t >= comet.life) { comet = null; nextComet = now + cometDelayMs(false, Math.random()); }
   }
   const hitComet = (x, y) => {

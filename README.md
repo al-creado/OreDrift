@@ -2,7 +2,7 @@
 
 A space-mining idle clicker for Android. Tap an asteroid, hire auto-miners, install upgrades, catch comets, finish daily missions, and relocate to richer belts for permanent bonuses.
 
-It is a Vite and vanilla JavaScript game wrapped for Android with Capacitor. It works fully offline: no account, no ads, no analytics, no network calls.
+It is a Vite and vanilla JavaScript game wrapped for Android with Capacitor. It plays offline with no account and no analytics. It is free with ads: a banner at the bottom plus optional rewarded ads (Google AdMob). A Shop sells optional items through Google Play (remove ads, ore packs, a starter bundle, a permanent boost).
 
 - Privacy policy: see [docs/index.html](docs/index.html) (published through GitHub Pages)
 - Full game rules, design and publishing steps: [docs/BUILD-GUIDE.md](docs/BUILD-GUIDE.md)
@@ -47,6 +47,8 @@ src/
   logic.js      pure game rules (no DOM); state and time are passed in
   storage.js    save validation, Capacitor Preferences with localStorage fallback
   native.js     Capacitor wrappers: lifecycle, back button, haptics, status bar, reminders
+  ads.js        AdMob: bottom banner, rewarded ads, consent
+  store.js      Google Play Billing: shop purchases and restore
   ui.js         DOM building and updating, tabs, toasts
   scene.js      canvas: asteroid, ships, comet, particles
   audio.js      synthesized sounds
@@ -58,8 +60,15 @@ docs/           privacy policy page and the build guide
 android/        Capacitor Android project
 ```
 
+## Ads and shop
+
+- `src/ads.js`: AdMob banner, rewarded ads, consent. Runs with Google's **test ads** until you set `ADS_TESTING = false` and fill in your real ad unit IDs. The AdMob app ID is separate, in `android/app/src/main/res/values/strings.xml`.
+- `src/store.js`: Google Play Billing through `@capgo/native-purchases`. Products are listed in `src/data.js` (`PRODUCTS`) and must exist in Play Console with the same IDs. See `store/listing.md` for the table and test steps.
+- On the dev server you can try both on a desktop with `?mockads&mockstore`, e.g. `http://localhost:5173/?mockads&mockstore`. These flags are removed from production builds.
+
 ## Before publishing
 
-- Set `PRIVACY_URL` in `src/main.js` to the hosted policy address.
+- Switch ads from test to live (see Ads and shop above) and create the six in-app products in Play Console.
+- `PRIVACY_URL` in `src/main.js` already points at the hosted policy; keep `docs/index.html` in sync with what the app does.
 - Replace the placeholder icons in `assets/` and the graphics in `store/` if you want your own art, then run `npx @capacitor/assets generate --android`.
 - Go through the checklist in section 10 of the [build guide](docs/BUILD-GUIDE.md) on a real phone.

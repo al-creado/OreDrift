@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { GENS, UPS, ACHS } from '../src/data.js';
+import { GENS, UPS, ACHS, PRODUCTS } from '../src/data.js';
 import * as L from '../src/logic.js';
 import { simulate } from './sim.js';
 
@@ -733,11 +733,127 @@ describe('number formatting', () => {
   });
 });
 
+describe('cargo pod (rewarded ad)', () => {
+  it('pays 13 minutes of output with a 300 t floor', () => {
+    expect(L.podReward(state())).toBe(300);
+    expect(L.podReward(state({ owned: { laser: 10 } }))).toBe(20 * 60 * 13);
+    expect(L.podReward(state({ owned: { laser: 10 }, frenzyUntil: NOW + 1e6 }))).toBe(20 * 60 * 13);
+  });
+
+  it('pays once, then waits 10 minutes', () => {
+    const S = state({ owned: { laser: 10 } });
+    expect(L.claimPod(S, NOW)).toBe(15600);
+    expect(S.ore).toBe(15600);
+    expect(S.podReadyAt).toBe(NOW + 600000);
+    expect(L.podWaitMs(S, NOW + 1000)).toBe(599000);
+    expect(L.claimPod(S, NOW + 1000)).toBe(0);
+    expect(S.ore).toBe(15600);
+    expect(L.podWaitMs(S, NOW + 600000)).toBe(0);
+    expect(L.claimPod(S, NOW + 600000)).toBe(15600);
+  });
+
+  it('counts as reward ore, not toward the mine mission', () => {
+    const S = state();
+    S.daily = { day: 'x', chest: false, missions: [
+      { type: 'mine', target: 1000, progress: 0, claimed: false },
+      { type: 'tap', target: 5, progress: 0, claimed: false },
+      { type: 'buy', target: 5, progress: 0, claimed: false }] };
+    L.claimPod(S, NOW);
+    expect(S.daily.missions[0].progress).toBe(0);
+    expect(S.allTime).toBe(300);
+  });
+});
+
+describe('shop', () => {
+  it('has the six products with unique ids', () => {
+    expect(PRODUCTS.map((p) => p.id)).toEqual(['remove_ads', 'starter_bundle', 'boost_25', 'ore_small', 'ore_medium', 'ore_large']);
+    expect(new Set(PRODUCTS.map((p) => p.id)).size).toBe(6);
+    for (const p of PRODUCTS) expect(p.id).toMatch(/^[a-z0-9_]+$/);
+  });
+
+  it('packs pay hours of current output with a floor', () => {
+    const small = L.productById('ore_small'), large = L.productById('ore_large');
+    expect(L.productOre(state(), small)).toBe(2000);
+    const S = state({ owned: { laser: 10 } }); // 20 t/s
+    expect(L.productOre(S, small)).toBe(20 * 3600);
+    expect(L.productOre(S, large)).toBe(20 * 3600 * 24);
+    expect(L.productOre(S, L.productById('remove_ads'))).toBe(0);
+  });
+
+  it('a pack is repeatable but never granted twice for the same order', () => {
+    const S = state({ owned: { laser: 10 } });
+    expect(L.applyPurchase(S, 'ore_small', 'order-1', NOW)).toMatchObject({ ok: true, ore: 72000, restored: false });
+    expect(S.ore).toBe(72000);
+    expect(L.applyPurchase(S, 'ore_small', 'order-1', NOW)).toMatchObject({ ok: true, ore: 0, restored: true });
+    expect(S.ore).toBe(72000);
+    expect(L.applyPurchase(S, 'ore_small', 'order-2', NOW).ore).toBe(72000);
+    expect(S.ore).toBe(144000);
+  });
+
+  it('remembers only the latest 50 order ids', () => {
+    const S = state();
+    for (let i = 0; i < 60; i++) L.applyPurchase(S, 'ore_small', 'o' + i, NOW);
+    expect(S.granted).toHaveLength(50);
+    expect(S.granted[0]).toBe('o59');
+  });
+
+  it('purchased ore counts as reward ore (not the mine mission)', () => {
+    const S = state();
+    S.daily = { day: 'x', chest: false, missions: [
+      { type: 'mine', target: 1000, progress: 0, claimed: false },
+      { type: 'tap', target: 5, progress: 0, claimed: false },
+      { type: 'buy', target: 5, progress: 0, claimed: false }] };
+    L.applyPurchase(S, 'ore_small', 'x', NOW);
+    expect(S.daily.missions[0].progress).toBe(0);
+    expect(S.allTime).toBe(2000);
+  });
+
+  it('remove ads sets the flag once', () => {
+    const S = state();
+    expect(L.adsRemoved(S)).toBe(false);
+    expect(L.applyPurchase(S, 'remove_ads', 'a', NOW)).toMatchObject({ ok: true, restored: false });
+    expect(L.adsRemoved(S)).toBe(true);
+    expect(L.applyPurchase(S, 'remove_ads', 'b', NOW).restored).toBe(true);
+    expect(L.owns(S, 'remove_ads')).toBe(true);
+  });
+
+  it('the boost multiplies output and taps by 1.25 and survives relocate', () => {
+    const S = state({ total: 4e6, owned: { laser: 10 }, ups: { bits: true } });
+    const o = L.ops(S), t = L.tapValue(S, NOW, 0);
+    L.applyPurchase(S, 'boost_25', 'b', NOW);
+    expect(L.ops(S)).toBeCloseTo(o * 1.25, 9);
+    expect(L.tapValue(S, NOW, 0)).toBeCloseTo(t * 1.25, 9);
+    L.relocate(S);
+    expect(S.iap.boost).toBe(true);
+    expect(L.iapMult(S)).toBe(1.25);
+  });
+
+  it('starter bundle pays once: ore plus a 120 s frenzy', () => {
+    const S = state({ owned: { laser: 10 } });
+    const r = L.applyPurchase(S, 'starter_bundle', 's', NOW);
+    expect(r).toMatchObject({ ok: true, ore: 20 * 3600 * 3, frenzy: 120, restored: false });
+    expect(S.frenzyUntil).toBe(NOW + 120000);
+    expect(L.applyPurchase(S, 'starter_bundle', 's2', NOW)).toMatchObject({ ore: 0, restored: true });
+    expect(S.ore).toBe(20 * 3600 * 3);
+  });
+
+  it('restoreOwned sets flags without paying', () => {
+    const S = state();
+    L.restoreOwned(S, 'remove_ads'); L.restoreOwned(S, 'boost_25'); L.restoreOwned(S, 'starter_bundle'); L.restoreOwned(S, 'ore_small');
+    expect(S.iap).toEqual({ removeAds: true, starter: true, boost: true });
+    expect(S.ore).toBe(0);
+  });
+
+  it('unknown products are refused', () => {
+    expect(L.applyPurchase(state(), 'gold_bars', 'x', NOW).ok).toBe(false);
+  });
+});
+
 describe('save-shape defaults', () => {
   it('fresh state has the documented fields', () => {
     const S = L.fresh(42);
     expect(Object.keys(S).sort()).toEqual(['ach', 'allTime', 'daily', 'frenzyUntil', 'last', 'lastSupply', 'owned',
-      'notify', 'points', 'ore', 'runs', 'sound', 'stats', 'streak', 'taps', 'total', 'ups'].sort());
+      'granted', 'iap', 'notify', 'podReadyAt', 'points', 'ore', 'runs', 'sound', 'stats', 'streak', 'taps', 'total', 'ups'].sort());
     expect(S.last).toBe(42);
     expect(S.sound).toBe(true);
   });

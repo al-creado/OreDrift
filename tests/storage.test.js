@@ -11,14 +11,15 @@ const goodSave = () => ({
     { type: 'tap', target: 150, progress: 20, claimed: false },
     { type: 'buy', target: 10, progress: 10, claimed: true },
     { type: 'comet', target: 3, progress: 1, claimed: false }] },
-  frenzyUntil: NOW + 5000,
+  frenzyUntil: NOW + 5000, podReadyAt: NOW + 1000,
+  iap: { removeAds: true, boost: true }, granted: ['GPA.1', 'GPA.2'],
 });
 const parse = (o) => parseSave(typeof o === 'string' ? o : JSON.stringify(o), NOW);
 
 describe('parseSave', () => {
   it('round-trips a good save', () => {
     const S = parse(goodSave());
-    expect(S).toMatchObject({ ore: 12.5, total: 500, allTime: 9000, taps: 40, points: 2, runs: 1, sound: false, notify: true, streak: 3, lastSupply: '2026-03-10', frenzyUntil: NOW + 5000 });
+    expect(S).toMatchObject({ ore: 12.5, total: 500, allTime: 9000, taps: 40, points: 2, runs: 1, sound: false, notify: true, streak: 3, lastSupply: '2026-03-10', frenzyUntil: NOW + 5000, podReadyAt: NOW + 1000 });
     expect(S.owned).toEqual({ drone: 5, laser: 2 });
     expect(S.ups).toEqual({ bits: true });
     expect(S.ach).toEqual({ t1: true });
@@ -38,8 +39,8 @@ describe('parseSave', () => {
   });
 
   it('bad numbers fall back to defaults', () => {
-    const S = parse({ ...goodSave(), ore: -5, total: 'lots', taps: NaN, points: Infinity, runs: null, allTime: -1, streak: -2, frenzyUntil: 'x' });
-    expect(S).toMatchObject({ ore: 0, total: 0, taps: 0, points: 0, runs: 0, allTime: 0, streak: 0, frenzyUntil: 0 });
+    const S = parse({ ...goodSave(), ore: -5, total: 'lots', taps: NaN, points: Infinity, runs: null, allTime: -1, streak: -2, frenzyUntil: 'x', podReadyAt: -1 });
+    expect(S).toMatchObject({ podReadyAt: 0, ore: 0, total: 0, taps: 0, points: 0, runs: 0, allTime: 0, streak: 0, frenzyUntil: 0 });
   });
 
   it('JSON cannot carry NaN or Infinity, but null and strings are rejected too', () => {
@@ -94,6 +95,16 @@ describe('parseSave', () => {
     g.daily.missions[0] = { type: 'tap', target: 150, progress: 99999, claimed: 'yes' };
     const S = parse(g);
     expect(S.daily.missions[0]).toEqual({ type: 'tap', target: 150, progress: 150, claimed: false });
+  });
+
+  it('reads purchases and ignores junk', () => {
+    const S = parse(goodSave());
+    expect(S.iap).toEqual({ removeAds: true, starter: false, boost: true });
+    expect(S.granted).toEqual(['GPA.1', 'GPA.2']);
+    const T = parse({ ...goodSave(), iap: { removeAds: 'yes', boost: 1, starter: true, gold: true }, granted: ['ok', 5, '', null, 'x'.repeat(300)] });
+    expect(T.iap).toEqual({ removeAds: false, starter: true, boost: false });
+    expect(T.granted).toEqual(['ok']);
+    expect(parse({ ...goodSave(), iap: 'x', granted: 'y' })).toMatchObject({ iap: { removeAds: false, starter: false, boost: false }, granted: [] });
   });
 
   it('a save from the future cannot create negative time away', () => {
