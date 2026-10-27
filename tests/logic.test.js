@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { GENS, UPS, ACHS, PRODUCTS } from '../src/data.js';
+import { GENS, UPS, ACHS, PRODUCTS, ACH_GROUPS, RANKS, JOURNAL } from '../src/data.js';
 import * as L from '../src/logic.js';
 import { simulate } from './sim.js';
 
@@ -10,11 +10,11 @@ const D = (y, m, d) => new Date(y, m - 1, d, 12);
 const state = (patch = {}) => Object.assign(L.fresh(NOW), patch);
 
 describe('data', () => {
-  it('has 7 vessels, 9 upgrades and 32 commendations with unique ids', () => {
+  it('has 7 vessels, 9 upgrades and 69 commendations with unique ids', () => {
     expect(GENS).toHaveLength(7);
     expect(UPS).toHaveLength(9);
-    expect(ACHS).toHaveLength(32);
-    expect(new Set(ACHS.map((a) => a.id)).size).toBe(32);
+    expect(ACHS).toHaveLength(69);
+    expect(new Set(ACHS.map((a) => a.id)).size).toBe(69);
   });
 });
 
@@ -230,6 +230,49 @@ describe('survey points and relocate', () => {
     expect(L.nextPointAt(state({ total: 0 }))).toBe(1e6);
   });
 
+  it('previews what relocating would do without changing anything', () => {
+    const S = state({ points: 2, total: 6.5e6, ore: 1234, owned: { drone: 3, laser: 4 }, ups: { bits: true, tune1: true } });
+    const before = JSON.stringify(S);
+    const p = L.relocatePreview(S);
+    expect(JSON.stringify(S)).toBe(before);
+    expect(p.gain).toBe(2);
+    expect(p).toMatchObject({ pointsBefore: 2, pointsAfter: 4, nextAt: 9e6 });
+    expect(p.surveyBefore).toBeCloseTo(0.2, 9);
+    expect(p.surveyAfter).toBeCloseTo(0.4, 9);
+    expect(p.bonusBefore).toBeCloseTo(0.2, 9);
+    expect(p.bonusAfter).toBeCloseTo(0.4, 9);
+    expect(p.ratio).toBeCloseTo(1.4 / 1.2, 9);
+    expect(p.progress).toBeCloseTo((6.5e6 - 4e6) / 5e6, 9);
+    expect(p.lose).toEqual({ ore: 1234, vessels: 7, upgrades: 2, run: 6.5e6 });
+  });
+
+  it('the preview matches what relocating really gives', () => {
+    const S = state({ points: 3, total: 9e6, owned: { laser: 10 }, ach: { t1: true }, iap: { removeAds: false, starter: false, boost: true } });
+    const p = L.relocatePreview(S), opsBefore = L.ops(S);
+    L.relocate(S);
+    S.owned = { laser: 10 };
+    expect(S.points).toBe(p.pointsAfter);
+    expect(L.achMult(S) * L.iapMult(S) * L.surveyMult(S) - 1).toBeCloseTo(p.bonusAfter, 9);
+    expect(L.ops(S) / opsBefore).toBeCloseTo(p.ratio, 9);
+  });
+
+  it('preview with no points yet shows progress toward the first one', () => {
+    const p = L.relocatePreview(state({ total: 4e5 }));
+    expect(p.gain).toBe(0);
+    expect(p.progress).toBeCloseTo(0.4, 9);
+    expect(p.nextAt).toBe(1e6);
+    expect(p.ratio).toBe(1);
+    expect(L.relocatePreview(state({ total: 0 })).progress).toBe(0);
+  });
+
+  it('includes commendations and the shop boost in the total bonus', () => {
+    const S = state({ points: 1, total: 1e6, ach: { t1: true, sh1: true }, iap: { removeAds: false, starter: false, boost: true } });
+    const p = L.relocatePreview(S);
+    const other = 1.015 * 1.25;
+    expect(p.bonusBefore).toBeCloseTo(1.1 * other - 1, 9);
+    expect(p.bonusAfter).toBeCloseTo(1.2 * other - 1, 9);
+  });
+
   it('is refused below 1 point and leaves state alone', () => {
     const S = state({ total: 5e5, ore: 7, owned: { drone: 3 } });
     expect(L.relocate(S)).toBe(0);
@@ -341,28 +384,87 @@ describe('comets', () => {
     expect(L.cometDelayMs(true, 1)).toBe(110000);
   });
 
-  it('70% of rewards are a 30 s frenzy, 30% a pod worth 13 minutes (min 300 t)', () => {
-    const S = state();
-    expect(L.catchCometReward(S, NOW, 0.69)).toEqual({ kind: 'frenzy', sec: 30 });
-    expect(S.frenzyUntil).toBe(NOW + 30000);
-    expect(S.stats.comets).toBe(1);
-    const T = state(); // no fleet: pod pays the 300 t floor
-    expect(L.catchCometReward(T, NOW, 0.7)).toEqual({ kind: 'pod', gain: 300 });
-    expect(T.ore).toBe(300);
-    const V = state({ owned: { laser: 10 } }); // 20 t/s * 780 s = 15600
-    expect(L.catchCometReward(V, NOW, 0.99).gain).toBe(15600);
+  it('60% of flyers are supply ships and 40% comets', () => {
+    expect(L.SUPPLY_SHIP_CHANCE).toBe(0.6);
+    expect(L.pickFlyer(0)).toBe('ship');
+    expect(L.pickFlyer(0.599)).toBe('ship');
+    expect(L.pickFlyer(0.6)).toBe('comet');
+    expect(L.pickFlyer(0.999)).toBe('comet');
   });
 
-  it('counts toward the comet mission but pod ore does not count toward mine', () => {
+  it('two comets in a row guarantee a supply ship next', () => {
+    expect(L.GUARANTEE_AFTER).toBe(2);
+    expect(L.pickFlyer(0.99, ['comet', 'comet'])).toBe('ship');
+    expect(L.pickFlyer(0.99, ['ship', 'comet', 'comet'])).toBe('ship');
+    expect(L.pickFlyer(0.99, ['comet'])).toBe('comet');             // one comet is not enough
+    expect(L.pickFlyer(0.99, ['comet', 'ship'])).toBe('comet');     // a ship in between resets the count
+    expect(L.pickFlyer(0.99, ['comet', 'ship', 'comet'])).toBe('comet');
+    expect(L.pickFlyer(0.99, [])).toBe('comet');
+    expect(L.pickFlyer(0.1, ['comet', 'comet'])).toBe('ship');
+  });
+
+  it('over many flyers there are never three comets in a row, and ships stay at least 60%', () => {
+    let seed = 12345;
+    const rand = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    const history = [];
+    let ships = 0, run = 0, longest = 0;
+    for (let i = 0; i < 5000; i++) {
+      const kind = L.pickFlyer(rand(), history);
+      history.push(kind); if (history.length > 4) history.shift();
+      if (kind === 'ship') { ships++; run = 0; } else { run++; longest = Math.max(longest, run); }
+    }
+    expect(longest).toBeLessThanOrEqual(2);
+    expect(ships / 5000).toBeGreaterThan(0.6);
+    expect(ships / 5000).toBeLessThan(0.8);
+  });
+
+  it('a supply ship gives a temporary x7 boost for 30 s and no ore', () => {
+    const S = state({ owned: { laser: 10 } });
+    expect(L.catchSupplyShip(S, NOW)).toEqual({ kind: 'frenzy', sec: 30 });
+    expect(S.frenzyUntil).toBe(NOW + 30000);
+    expect(S.ore).toBe(0);
+    expect(S.stats.comets).toBe(1);
+    expect(L.ops(S, NOW + 1000)).toBe(140); // 20 t/s x 7
+  });
+
+  it('catching ships back to back stacks the boost up to the cap', () => {
+    const S = state();
+    L.catchSupplyShip(S, NOW);
+    L.catchSupplyShip(S, NOW + 1000);
+    expect(S.frenzyUntil).toBe(NOW + 60000);
+  });
+
+  it('a comet drops a random 5 to 25 minutes of output, at least 300 t, and no boost', () => {
+    const V = state({ owned: { laser: 10 } }); // 20 t/s
+    expect(L.catchComet(V, 0)).toMatchObject({ kind: 'ore', minutes: 5, gain: 20 * 60 * 5 });
+    expect(L.catchComet(V, 1)).toMatchObject({ minutes: 25, gain: 20 * 60 * 25 });
+    expect(L.catchComet(V, 0.5)).toMatchObject({ minutes: 15, gain: 20 * 60 * 15 });
+    expect(V.frenzyUntil).toBe(0);
+    expect(V.stats.comets).toBe(3);
+    const T = state(); // no fleet: the 300 t floor
+    expect(L.catchComet(T, 0.7)).toEqual({ kind: 'ore', gain: 300, minutes: 19 });
+    expect(T.ore).toBe(300);
+  });
+
+  it('comet ore varies with the random value', () => {
+    const gains = new Set();
+    for (let i = 0; i <= 10; i++) gains.add(L.catchComet(state({ owned: { laser: 10 } }), i / 10).gain);
+    expect(gains.size).toBe(11);
+    expect(Math.max(...gains)).toBe(5 * Math.min(...gains));
+  });
+
+  it('both count toward the comet mission, and neither adds to the mine mission', () => {
     const S = state();
     S.daily = { day: 'x', chest: false, missions: [
-      { type: 'comet', target: 2, progress: 0, claimed: false },
+      { type: 'comet', target: 3, progress: 0, claimed: false },
       { type: 'mine', target: 1000, progress: 0, claimed: false },
       { type: 'tap', target: 5, progress: 0, claimed: false }] };
-    L.catchCometReward(S, NOW, 0.9);
-    expect(S.daily.missions[0].progress).toBe(1);
+    L.catchComet(S, 0.9);
+    L.catchSupplyShip(S, NOW);
+    expect(S.daily.missions[0].progress).toBe(2);
     expect(S.daily.missions[1].progress).toBe(0);
     expect(S.total).toBe(300);
+    expect(S.stats.comets).toBe(2);
   });
 });
 
@@ -581,39 +683,130 @@ describe('daily missions', () => {
     expect(L.missionText({ type: 'tap', target: 1500 })).toBe('Tap the asteroid 1.50K times');
     expect(L.missionText({ type: 'mine', target: 49000 })).toBe('Mine 49.0K t of ore');
     expect(L.missionText({ type: 'buy', target: 12 })).toBe('Hire 12 vessels');
-    expect(L.missionText({ type: 'comet', target: 3 })).toBe('Catch 3 comets');
+    expect(L.missionText({ type: 'comet', target: 3 })).toBe('Catch 3 comets or supply ships');
   });
 });
 
 describe('commendations', () => {
+  const ORIGINAL = {
+    t1: 100, t2: 1000, t3: 10000, t4: 100000, o1: 1000, o2: 1e6, o3: 1e9, o4: 1e12,
+    f1: 10, f2: 50, f3: 150, f4: 400, k1: 3, k2: 5, k3: 7, u1: 3, u2: 9,
+    r1: 1, r2: 5, r3: 10, c1: 1, c2: 25, c3: 100, m1: 3, m2: 30, m3: 100,
+    s1: 3, s2: 7, s3: 30, p1: 100, p2: 10000, p3: 1e6,
+  };
+  const NEW_IDS = ACHS.filter((a) => !(a.id in ORIGINAL)).map((a) => a.id);
+
   // One probe per achievement: set the underlying stat to just below, then exactly at, the threshold.
   const setStat = (S, stat, v) => {
     switch (stat) {
       case 'taps': S.taps = v; break;
       case 'allTime': S.allTime = v; break;
+      case 'heldOre': S.ore = v; break;
       case 'runs': S.runs = v; break;
+      case 'points': S.points = v; break;
       case 'comets': S.stats.comets = v; break;
+      case 'ships': S.stats.ships = v; S.stats.comets = v; break;
+      case 'cometsOnly': S.stats.comets = v; S.stats.ships = 0; break;
       case 'missions': S.stats.missions = v; break;
+      case 'chests': S.stats.chests = v; break;
       case 'best': S.stats.best = v; break;
-      case 'fleet': S.owned = { drone: v }; break;
+      case 'drops': S.stats.drops = v; break;
+      case 'capped': S.stats.capped = v; break;
+      case 'night': S.stats.night = v; break;
+      case 'bare': S.stats.bare = v; break;
+      case 'bestRun': S.stats.bestRun = v; break;
+      case 'overdrive': S.stats.overdrive = v; break;
+      case 'fleet': case 'maxVessel': S.owned = { drone: v }; break;
       case 'kinds': S.owned = Object.fromEntries(GENS.slice(0, v).map((x) => [x.id, 1])); break;
       case 'upgrades': S.ups = Object.fromEntries(UPS.slice(0, v).map((x) => [x.id, true])); break;
       default: throw new Error(stat);
     }
   };
 
-  const expectedThresholds = {
-    t1: 100, t2: 1000, t3: 10000, t4: 100000, o1: 1000, o2: 1e6, o3: 1e9, o4: 1e12,
-    f1: 10, f2: 50, f3: 150, f4: 400, k1: 3, k2: 5, k3: 7, u1: 3, u2: 9,
-    r1: 1, r2: 5, r3: 10, c1: 1, c2: 25, c3: 100, m1: 3, m2: 30, m3: 100,
-    s1: 3, s2: 7, s3: 30, p1: 100, p2: 10000, p3: 1e6,
-  };
-
-  it('has the 32 thresholds from the spec', () => {
-    expect(Object.fromEntries(ACHS.map((a) => [a.id, a.t]))).toEqual(expectedThresholds);
+  it('keeps the original 32 commendations with the same thresholds and +1% bonus', () => {
+    for (const [id, t] of Object.entries(ORIGINAL)) {
+      const a = ACHS.find((x) => x.id === id);
+      expect(a, id).toBeDefined();
+      expect(a.t).toBe(t);
+      expect(L.achBonus(a)).toBe(0.01);
+      expect(a.secret).toBeUndefined();
+    }
+    expect(NEW_IDS).toHaveLength(37);
   });
 
-  for (const a of ACHS.filter((x) => x.stat !== 'rate')) {
+  it('every commendation has a known group and a tier, and the new ones give +0.5%', () => {
+    for (const a of ACHS) {
+      expect(ACH_GROUPS, a.id).toContain(a.group);
+      expect(a.tier, a.id).toBeGreaterThanOrEqual(1);
+      expect(a.tier, a.id).toBeLessThanOrEqual(5);
+      expect(a.t, a.id).toBeGreaterThan(0);
+      expect(typeof L.statValue(state(), a.stat), a.id).toBe('number');
+    }
+    for (const id of NEW_IDS) expect(L.achBonus(ACHS.find((a) => a.id === id)), id).toBe(0.005);
+  });
+
+  describe('chains (one tile for Bronze, Silver, Gold...)', () => {
+    it('puts every commendation in exactly one chain, giving 26 tiles', () => {
+      const ids = L.CHAINS.flatMap((c) => c.steps.map((a) => a.id));
+      expect(ids).toHaveLength(69);
+      expect(new Set(ids).size).toBe(69);
+      expect(L.CHAINS).toHaveLength(26);
+      expect(new Set(L.CHAINS.map((c) => c.id)).size).toBe(26);
+      for (const a of ACHS) expect(a.chain, a.id).toBeTruthy();
+    });
+
+    it('each chain is one goal measured one way, with rising thresholds and tiers', () => {
+      for (const c of L.CHAINS) {
+        expect(c.title, c.id).toBeTruthy();
+        for (let i = 0; i < c.steps.length; i++) {
+          expect(c.steps[i].stat, c.id).toBe(c.steps[0].stat);
+          expect(c.steps[i].group, c.id).toBe(c.group);
+          if (i) {
+            expect(c.steps[i].t, c.id).toBeGreaterThan(c.steps[i - 1].t);
+            expect(c.steps[i].tier, c.id).toBeGreaterThanOrEqual(c.steps[i - 1].tier);
+          }
+        }
+      }
+    });
+
+    it('the long goals are chains and the eight secrets are single tiles', () => {
+      const len = (id) => L.CHAINS.find((c) => c.id === id).steps.length;
+      expect([len('taps'), len('ore'), len('fleet'), len('survey'), len('relocations')]).toEqual([4, 5, 5, 4, 4]);
+      expect(L.CHAINS.filter((c) => c.secret).map((c) => c.id).sort()).toEqual(['barehands', 'eagleeye', 'hoard', 'nightowl', 'overdrive', 'ringed', 'sleeper', 'spectrum']);
+      expect(L.CHAINS.filter((c) => c.secret).every((c) => c.steps.length === 1)).toBe(true);
+    });
+
+    it('tracks the tiers earned and the one being worked on', () => {
+      const taps = L.CHAINS.find((c) => c.id === 'taps');
+      const S = state();
+      expect(L.chainState(S, taps)).toMatchObject({ earnedCount: 0, total: 4, complete: false, last: null });
+      expect(L.chainState(S, taps).next.id).toBe('t1');
+      S.taps = 1500; L.checkAch(S);
+      const st = L.chainState(S, taps);
+      expect(st.earnedCount).toBe(2);
+      expect(st.last.id).toBe('t2');
+      expect(st.next.id).toBe('t3');
+      S.taps = 1e6; L.checkAch(S);
+      const done = L.chainState(S, taps);
+      expect(done).toMatchObject({ earnedCount: 4, complete: true, next: null });
+      expect(done.last.id).toBe('t4');
+    });
+
+    it('a secret chain is hidden until its tier is earned', () => {
+      const hoard = L.CHAINS.find((c) => c.id === 'hoard'), taps = L.CHAINS.find((c) => c.id === 'taps');
+      const S = state();
+      expect(L.chainHidden(S, hoard)).toBe(true);
+      expect(L.chainHidden(S, taps)).toBe(false);
+      S.ore = 1e9; L.checkAch(S);
+      expect(L.chainHidden(S, hoard)).toBe(false);
+    });
+  });
+
+  it('has eight secret commendations', () => {
+    expect(ACHS.filter((a) => a.secret).map((a) => a.id).sort()).toEqual(['br1', 'er1', 'h1', 'n1', 'ov1', 'rb1', 'rb2', 'z1']);
+  });
+
+  for (const a of ACHS.filter((x) => x.stat !== 'rate' && x.stat !== 'tapPower' && x.stat !== 'achs')) {
     it(`${a.name} unlocks at exactly ${a.t}`, () => {
       const S = state();
       setStat(S, a.stat, a.t - 1);
@@ -628,16 +821,56 @@ describe('commendations', () => {
   for (const a of ACHS.filter((x) => x.stat === 'rate')) {
     it(`${a.name} unlocks at ${a.t} t/s (no frenzy)`, () => {
       const S = state({ owned: { drone: 1 }, frenzyUntil: NOW + 1e9 });
-      // 1 laser = 1 t/s; scale with a stack of collectors to land on each side of the threshold
+      // scale with a stack of collectors to land on each side of the threshold
       const probe = (n) => { S.owned = { collector: n }; return L.achValue(S, a); };
       let n = 1;
-      while (probe(n) < a.t && n < 2000) n++;
+      while (probe(n) < a.t && n < 100000) n += n < 2000 ? 1 : 500;
       expect(probe(n)).toBeGreaterThanOrEqual(a.t);
-      expect(probe(n - 1)).toBeLessThan(a.t);
+      expect(probe(Math.max(0, n - (n < 2000 ? 1 : 500)))).toBeLessThan(a.t);
       S.owned = { collector: n };
       expect(L.checkAch(S).map((x) => x.id)).toContain(a.id);
     });
   }
+
+  describe('single tap power', () => {
+    const tapAch = ACHS.filter((a) => a.stat === 'tapPower');
+    it('measures one tap without a frenzy', () => {
+      const S = state({ frenzyUntil: NOW + 1e9 });
+      expect(L.statValue(S, 'tapPower')).toBe(1);
+      S.ups = { bits: true, plasma: true, hammer: true, pulse: true };
+      expect(L.statValue(S, 'tapPower')).toBe(60);
+    });
+    it('Heavy Hand needs a tap worth 100 t', () => {
+      const S = state({ ups: { bits: true, plasma: true, hammer: true, pulse: true } });
+      expect(L.checkAch(S).map((x) => x.id)).not.toContain('tp1'); // 60 t
+      S.points = 7; // 60 x 1.7 = 102
+      expect(L.checkAch(S).map((x) => x.id)).toContain('tp1');
+    });
+    it('uplinks count, so a huge fleet makes huge taps', () => {
+      const S = state({ owned: { collector: 1000 }, ups: { uplink: true, uplink2: true } });
+      const got = L.checkAch(S).map((x) => x.id);
+      for (const a of tapAch) expect(got).toContain(a.id);
+    });
+  });
+
+  it('Collector, Curator and Archivist count every commendation earned, including each other', () => {
+    const mark = (n) => Object.fromEntries(ACHS.filter((x) => x.stat !== 'achs').slice(-n).map((x) => [x.id, true]));
+    const run = (n) => { const S = state(); S.ach = mark(n); return L.checkAch(S).map((x) => x.id); };
+    expect(run(9)).toEqual([]);
+    expect(run(10)).toEqual(['a1']);
+    expect(run(23)).toEqual(['a1']);          // 23 + Collector = 24, one short of Curator
+    expect(run(24)).toEqual(['a1', 'a2']);    // 24 + Collector = 25
+    expect(run(43)).toEqual(['a1', 'a2', 'a3']);
+  });
+
+  it('"earn N commendations" can be met by commendations unlocked in the same check', () => {
+    const S = state();
+    S.ach = Object.fromEntries(ACHS.filter((x) => x.stat !== 'achs').slice(-9).map((x) => [x.id, true])); // 9 earned
+    S.taps = 100; // unlocks First Strikes, which makes 10
+    const got = L.checkAch(S).map((x) => x.id);
+    expect(got).toContain('t1');
+    expect(got).toContain('a1');
+  });
 
   it('lifetime ore uses allTime, not the run total', () => {
     const S = state({ total: 0, allTime: 1000 });
@@ -654,13 +887,186 @@ describe('commendations', () => {
     expect(S.ach.u2).toBe(true); // earned ones persist
   });
 
-  it('each one adds exactly 1% to output and taps', () => {
-    const S = state({ owned: { laser: 10 } });
-    expect(L.achMult(S)).toBe(1);
-    S.ach = { t1: true, t2: true, t3: true };
-    expect(L.achMult(S)).toBeCloseTo(1.03, 12);
-    expect(L.ops(S)).toBeCloseTo(20 * 1.03, 9);
-    expect(L.tapValue(S, NOW, 0)).toBeCloseTo(1.03, 9);
+  describe('bonus', () => {
+    it('the original ones add exactly 1% each to output and taps', () => {
+      const S = state({ owned: { laser: 10 } });
+      expect(L.achMult(S)).toBe(1);
+      S.ach = { t1: true, t2: true, t3: true };
+      expect(L.achMult(S)).toBeCloseTo(1.03, 12);
+      expect(L.ops(S)).toBeCloseTo(20 * 1.03, 9);
+      expect(L.tapValue(S, NOW, 0)).toBeCloseTo(1.03, 9);
+    });
+    it('newer ones add 0.5% and the two kinds add up', () => {
+      const S = state({ owned: { laser: 10 } });
+      S.ach = { sh1: true };
+      expect(L.achMult(S)).toBeCloseTo(1.005, 12);
+      S.ach = { t1: true, sh1: true, d1: true };
+      expect(L.achBonusTotal(S)).toBeCloseTo(0.02, 12);
+      expect(L.ops(S)).toBeCloseTo(20 * 1.02, 9);
+    });
+    it('earning all 69 adds 32% + 18.5%', () => {
+      const S = state();
+      S.ach = Object.fromEntries(ACHS.map((a) => [a.id, true]));
+      expect(L.achBonusTotal(S)).toBeCloseTo(0.32 + 0.185, 9);
+    });
+  });
+
+  describe('one-time ore gift', () => {
+    const byTier = (t) => ACHS.find((a) => a.tier === t);
+    it('pays minutes of current output by tier, with a floor', () => {
+      const S = state({ owned: { laser: 10 } }); // 20 t/s = 1,200 t/min
+      expect(L.achGiftAmount(S, byTier(1))).toBe(3600);    // 3 min
+      expect(L.achGiftAmount(S, byTier(2))).toBe(9600);    // 8 min
+      expect(L.achGiftAmount(S, byTier(3))).toBe(24000);   // 20 min
+      expect(L.achGiftAmount(S, byTier(4))).toBe(54000);   // 45 min
+      expect(L.achGiftAmount(S, ACHS.find((a) => a.tier === 5))).toBe(54000); // tier 5 pays like tier 4
+      const E = state();
+      expect([1, 2, 3, 4].map((t) => L.achGiftAmount(E, byTier(t)))).toEqual([250, 600, 1500, 4000]);
+    });
+    it('is reward ore: counts toward totals, not the mine mission', () => {
+      const S = state();
+      S.daily = { day: 'x', chest: false, missions: [
+        { type: 'mine', target: 100000, progress: 0, claimed: false },
+        { type: 'tap', target: 5, progress: 0, claimed: false },
+        { type: 'buy', target: 5, progress: 0, claimed: false }] };
+      expect(L.claimAchGift(S, byTier(1))).toBe(250);
+      expect(S.ore).toBe(250);
+      expect(S.allTime).toBe(250);
+      expect(S.daily.missions[0].progress).toBe(0);
+    });
+    it('checkAch alone pays nothing (the game pays it when announcing)', () => {
+      const S = state({ taps: 100 });
+      L.checkAch(S);
+      expect(S.ore).toBe(0);
+    });
+  });
+
+  it('secret commendations are hidden until earned', () => {
+    const h1 = ACHS.find((a) => a.id === 'h1'), t1 = ACHS.find((a) => a.id === 't1');
+    const S = state();
+    expect(L.isHidden(S, h1)).toBe(true);
+    expect(L.isHidden(S, t1)).toBe(false);
+    S.ore = 1e9; L.checkAch(S);
+    expect(L.isHidden(S, h1)).toBe(false);
+  });
+
+  it('ranks by number of commendations', () => {
+    expect(RANKS[0].min).toBe(0);
+    expect([0, 4, 5, 11, 12, 19, 20, 31, 32, 44, 45, 57, 58, 65].map((n) => L.rankFor(n).name)).toEqual([
+      'Rookie', 'Rookie', 'Prospector', 'Prospector', 'Miner', 'Miner', 'Foreman', 'Foreman', 'Baron', 'Baron', 'Tycoon', 'Tycoon', 'Legend', 'Legend']);
+  });
+
+  describe('new stats are counted', () => {
+    it('supply ships and comets', () => {
+      const S = state();
+      L.catchSupplyShip(S, NOW); L.catchSupplyShip(S, NOW); L.catchComet(S, 0.5);
+      expect(S.stats).toMatchObject({ comets: 3, ships: 2 });
+      expect(L.statValue(S, 'cometsOnly')).toBe(1);
+      expect(L.statValue(S, 'ships')).toBe(2);
+    });
+    it('supply drops and caches', () => {
+      const S = state();
+      L.claimSupply(S, D(2026, 3, 10)); L.claimSupply(S, D(2026, 3, 11));
+      expect(S.stats.drops).toBe(2);
+      S.daily = { day: 'x', chest: false, missions: [1, 2, 3].map(() => ({ type: 'tap', target: 1, progress: 1, claimed: true })) };
+      L.claimChest(S, NOW);
+      expect(S.stats.chests).toBe(1);
+      L.claimChest(S, NOW); // only once
+      expect(S.stats.chests).toBe(1);
+    });
+    it('returning after the offline limit', () => {
+      const S = state({ owned: { laser: 10 } });
+      L.applyOffline(S, 8 * 3600);
+      expect(S.stats.capped).toBe(0);
+      L.applyOffline(S, 8 * 3600 + 1);
+      expect(S.stats.capped).toBe(1);
+    });
+  });
+});
+
+describe('secret commendation mechanics', () => {
+  const at = (h) => new Date(2026, 0, 15, h, 30).getTime();
+
+  it('Night Owl counts only taps made between 2:00 and 3:59 local time', () => {
+    const S = state();
+    for (const h of [0, 1, 4, 12, 23]) L.tap(S, at(h));
+    expect(S.stats.night).toBe(0);
+    for (const h of [2, 3]) L.tap(S, at(h));
+    expect(S.stats.night).toBe(2);
+  });
+
+  it('Bare Hands counts relocating without a single upgrade installed', () => {
+    const A = state({ total: 1e6 });
+    L.relocate(A);
+    expect(A.stats.bare).toBe(1);
+    const B = state({ total: 1e6, ups: { bits: true } });
+    L.relocate(B);
+    expect(B.stats.bare).toBe(0);
+    const C = state({ total: 5e5 }); // not enough for a survey point: refused, so nothing counts
+    expect(L.relocate(C)).toBe(0);
+    expect(C.stats.bare).toBe(0);
+  });
+
+  it('Overdrive counts stacking the boost above 100 seconds', () => {
+    const S = state();
+    for (let i = 0; i < 3; i++) L.catchSupplyShip(S, NOW); // 30, 60, 90 s
+    expect(S.stats.overdrive).toBe(0);
+    L.catchSupplyShip(S, NOW);                              // capped at 120 s
+    expect(S.stats.overdrive).toBe(1);
+  });
+
+  it('Eagle Eye keeps the best run of catches without a miss', () => {
+    const S = state();
+    L.noteCatchRun(S, 1); L.noteCatchRun(S, 2); L.noteCatchRun(S, 3);
+    expect(S.stats.bestRun).toBe(3);
+    L.noteCatchRun(S, 1); // a miss reset the run; the best stays
+    expect(S.stats.bestRun).toBe(3);
+    for (let r = 1; r <= 5; r++) L.noteCatchRun(S, r);
+    expect(S.stats.bestRun).toBe(5);
+    expect(L.checkAch(S).map((a) => a.id)).toContain('er1');
+  });
+});
+
+describe("the Captain's journal", () => {
+  it('has 10 chapters with unique ids, and the first is always open', () => {
+    expect(JOURNAL).toHaveLength(10);
+    expect(new Set(JOURNAL.map((c) => c.id)).size).toBe(10);
+    expect(L.journalCount(state())).toBe(1);
+    for (const c of JOURNAL) {
+      expect(c.title.length).toBeGreaterThan(0);
+      expect(c.text.length).toBeGreaterThanOrEqual(2);
+    }
+  });
+
+  it('chapters unlock with lifetime progress', () => {
+    const S = state();
+    const count = (patch) => { Object.assign(S, patch); return L.journalCount(S); };
+    expect(count({})).toBe(1);
+    expect(count({ allTime: 1000 })).toBe(2);
+    expect(count({ stats: { ...S.stats, comets: 1 } })).toBe(3);
+    expect(count({ allTime: 1e6 })).toBe(4);
+    expect(count({ runs: 1 })).toBe(5);
+    expect(count({ runs: 2 })).toBe(6);
+    expect(count({ allTime: 1e8 })).toBe(7);
+    expect(count({ allTime: 1e9 })).toBe(8);
+    expect(count({ runs: 5 })).toBe(9);
+    expect(count({ allTime: 1e12 })).toBe(10);
+  });
+
+  it('keeps chapters unlocked after relocating', () => {
+    const S = state({ allTime: 5e6, total: 5e6 });
+    const before = L.journalCount(S);
+    L.relocate(S);
+    expect(L.journalCount(S)).toBeGreaterThanOrEqual(before);
+  });
+
+  it('hints at the secrets without ever naming one', () => {
+    const story = JOURNAL.flatMap((c) => [c.title, ...c.text]).join(' ').toLowerCase();
+    for (const a of ACHS.filter((x) => x.secret)) expect(story.includes(a.name.toLowerCase()), a.name).toBe(false);
+  });
+
+  it('every chapter that needs something says what', () => {
+    for (const c of JOURNAL.slice(1)) expect(c.req.length, c.id).toBeGreaterThan(0);
   });
 });
 
@@ -853,7 +1259,7 @@ describe('save-shape defaults', () => {
   it('fresh state has the documented fields', () => {
     const S = L.fresh(42);
     expect(Object.keys(S).sort()).toEqual(['ach', 'allTime', 'daily', 'frenzyUntil', 'last', 'lastSupply', 'owned',
-      'granted', 'iap', 'notify', 'podReadyAt', 'points', 'ore', 'runs', 'sound', 'stats', 'streak', 'taps', 'total', 'ups'].sort());
+      'granted', 'iap', 'journalSeen', 'music', 'notify', 'podReadyAt', 'points', 'ore', 'runs', 'sound', 'stats', 'streak', 'taps', 'total', 'ups'].sort());
     expect(S.last).toBe(42);
     expect(S.sound).toBe(true);
   });

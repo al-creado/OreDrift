@@ -7,11 +7,13 @@ import '@fontsource/ibm-plex-mono/500.css';
 import '@fontsource/ibm-plex-mono/600.css';
 import './style.css';
 
-import { FRENZY_MULT, ACH_BONUS } from './data.js';
+import { FRENZY_MULT } from './data.js';
 import * as L from './logic.js';
 import { createScene } from './scene.js';
 import { createUI } from './ui.js';
 import { sounds, setSoundEnabled } from './audio.js';
+import { startMusic, stopMusic } from './music.js';
+import { beltFor } from './belts.js';
 import { loadState, saveState } from './storage.js';
 import * as native from './native.js';
 import * as ads from './ads.js';
@@ -20,6 +22,12 @@ import * as store from './store.js';
 /* Hosted privacy policy (GitHub Pages, from docs/). The Settings link only shows when this is non-empty. */
 const PRIVACY_URL = 'https://al-creado.github.io/OreDrift/';
 const SAVE_EVERY_MS = 5000;
+/*
+ * The Shop tab and Google Play Billing stay switched off until the in-app products exist in Play Console.
+ * Set to true once they do (see store/listing.md). The dev-only ?mockstore flag still turns it on for a desktop try-out.
+ */
+const SHOP_ENABLED = false;
+const shopOn = () => SHOP_ENABLED || store.isMock();
 
 const $ = (id) => document.getElementById(id);
 const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -28,6 +36,8 @@ let S = L.fresh(Date.now());
 let lastT = Date.now();
 let paused = false;
 let ui, scene;
+let catchRun = 0;        // comets and supply ships caught in a row, without letting one pass
+let knownChapters = -1;  // journal chapters seen unlocked so far (-1 until the first check, so launch stays quiet)
 
 const save = () => saveState(S, Date.now());
 
@@ -78,10 +88,41 @@ function tick(now) {
 function housekeeping(now) {
   const had = !!S.daily;
   if (L.ensureDaily(S, new Date(now)) && had) ui.toast('New daily missions are ready.');
-  for (const a of L.checkAch(S)) {
-    ui.toast('Commendation earned: ' + a.name + '. All output +' + Math.round(ACH_BONUS * 100) + '%.', 4200);
-    sounds.achievement();
+  const earned = L.checkAch(S);
+  if (earned.length) announceAch(earned);
+  // A new chapter of the Captain's journal may have unlocked.
+  const chapters = L.journalUnlocked(S);
+  if (knownChapters >= 0 && chapters.length > knownChapters) {
+    const fresh = chapters.slice(knownChapters);
+    ui.toast(fresh.length === 1 ? 'New journal entry: ' + fresh[0].title + '. Read it on the Belt tab.' : fresh.length + ' new journal entries. Read them on the Belt tab.', 4500);
   }
+  knownChapters = chapters.length;
+}
+
+const pctText = (x) => Number((x * 100).toFixed(1)) + '%';
+
+/**
+ * Pays each new commendation's ore gift and announces it in the commendation banner (not the regular toast).
+ * One or a few unlock as separate banners in turn; many at once (e.g. right after an update) become a single summary.
+ */
+function announceAch(list) {
+  const gifts = list.map((a) => L.claimAchGift(S, a));
+  ui.markNew(list.map((a) => a.id));
+  if (list.length <= 3) {
+    list.forEach((a, i) => ui.achPop({
+      kicker: 'Commendation earned', name: a.name, tier: a.tier, sub: a.desc,
+      reward: '+' + pctText(L.achBonus(a)) + ' output and taps · +' + L.fmt(gifts[i]) + ' t',
+    }));
+  } else {
+    const bonus = list.reduce((t, a) => t + L.achBonus(a), 0), ore = gifts.reduce((t, g) => t + g, 0);
+    ui.achPop({
+      kicker: 'Commendations earned', many: true, tier: Math.max(...list.map((a) => a.tier)),
+      name: list.length + ' new', sub: list.slice(0, 3).map((a) => a.name).join(', ') + ' and ' + (list.length - 3) + ' more',
+      reward: '+' + pctText(bonus) + ' output and taps · +' + L.fmt(ore) + ' t',
+    });
+  }
+  sounds.achievement();
+  save();
 }
 
 function refresh() {
@@ -98,12 +139,20 @@ function doTap(x, y) {
   sounds.tap(); native.impact(false);
 }
 
+/** Catches whatever is passing: a supply ship (temporary boost) or a comet (a random amount of ore). */
 function catchComet() {
   const now = Date.now();
-  if (!scene.catchComet(now)) return;
-  const r = L.catchCometReward(S, now, Math.random());
-  if (r.kind === 'frenzy') ui.toast('Rich vein! Output ×' + FRENZY_MULT + ' for ' + r.sec + ' s.', 3500);
-  else ui.toast('Cargo pod! +' + L.fmt(r.gain) + ' t.', 3500);
+  const kind = scene.catchComet(now);
+  if (!kind) return;
+  if (kind === 'ship') {
+    const r = L.catchSupplyShip(S, now);
+    ui.toast('Supply ship! Output ×' + FRENZY_MULT + ' for ' + r.sec + ' s.', 3500);
+  } else {
+    const r = L.catchComet(S, Math.random());
+    ui.toast('Comet! +' + L.fmt(r.gain) + ' t of ore.', 3500);
+  }
+  catchRun++;
+  L.noteCatchRun(S, catchRun);
   sounds.comet(); native.impact(true);
   refresh();
 }
@@ -126,7 +175,7 @@ function onBuyUp(u) {
 function onRelocate() {
   const g = L.relocate(S);
   if (!g) return;
-  ui.toast('New belt surveyed. +' + g + ' survey point' + (g > 1 ? 's' : '') + '.', 4500);
+  ui.toast('New belt surveyed: ' + beltFor(S.runs).name + '. +' + g + ' survey point' + (g > 1 ? 's' : '') + '.', 4500);
   sounds.relocate();
   refresh(); save();
 }
@@ -136,11 +185,13 @@ function onWipe() {
   lastT = Date.now();
   ui.resetUpgradeList(); ui.resetAchList();
   scene.resetComet(Date.now());
+  catchRun = 0; knownChapters = -1;
   native.cancelReminders();
   L.ensureDaily(S, new Date());
   refresh(); save();
   ui.toast('Save wiped. Fresh belt.');
-  syncPurchases(false); // purchases live with the Google account, so bring owned items (Remove ads, boost) straight back
+  syncMusic();
+  if (shopOn()) syncPurchases(false); // purchases live with the Google account, so bring owned items (Remove ads, boost) straight back
 }
 
 function onClaimMission(i) {
@@ -240,6 +291,10 @@ async function syncPurchases(manual) {
 
 function onToggleSound() { S.sound = !S.sound; refresh(); save(); }
 
+/* Background music plays only while the app is on screen and Music is on. */
+function syncMusic() { if (S.music && !paused) startMusic(); else stopMusic(); }
+function onToggleMusic() { S.music = !S.music; syncMusic(); refresh(); save(); }
+
 async function onToggleNotify() {
   if (S.notify) {
     S.notify = false;
@@ -256,6 +311,7 @@ async function onToggleNotify() {
 /* ---------- lifecycle ---------- */
 function onHide() {
   paused = true;
+  stopMusic();
   const now = Date.now();
   S.last = now;
   save();
@@ -272,6 +328,7 @@ function onShow() {
   lastT = S.last;
   tick(now); // under a minute away earns at full rate, longer earns offline rate (same as the reference)
   prevDraw = now;
+  syncMusic();
   refresh();
   requestAnimationFrame(frame);
 }
@@ -297,7 +354,8 @@ async function boot() {
 
   ui = createUI({
     getState: () => S,
-    onBuy, onBuyUp, onClaimMission, onClaimChest, onClaimSupply, onRelocate, onWipe, onToggleSound,
+    onBuy, onBuyUp, onClaimMission, onClaimChest, onClaimSupply, onRelocate, onWipe, onToggleSound, onToggleMusic,
+    onOpenJournal: () => { S.journalSeen = L.journalCount(S); save(); refresh(); },
     onToggleNotify: native.isNative() ? onToggleNotify : null,
     onRefresh: refresh,
     podInfo, onWatchPod,
@@ -312,9 +370,11 @@ async function boot() {
   scene = createScene(cv, {
     reduced: REDUCED,
     frenzyOn: () => L.frenzyOn(S, Date.now()),
-    shipCount: () => L.fleetCount(S),
-    onCometSpawn: () => sounds.cometSpawn(),
-    onCometPing: () => sounds.cometPing(),
+    fleet: () => S.owned,
+    belt: () => S.runs,
+    onCometSpawn: (kind) => (kind === 'ship' ? sounds.shipSpawn() : sounds.cometSpawn()),
+    onCometPing: (kind) => (kind === 'ship' ? sounds.shipPing() : sounds.cometPing()),
+    onCometMissed: () => { catchRun = 0; }, // letting one pass breaks the run of catches
   });
   cv.addEventListener('pointerdown', (e) => {
     e.preventDefault();
@@ -328,11 +388,13 @@ async function boot() {
       doTap(w / 2 + (Math.random() - 0.5) * 40, h / 2);
     } else if (e.key === 'c' || e.key === 'C') catchComet();
   });
+  // Browsers and Android only allow audio after a touch, so the music starts with the first one.
+  document.addEventListener('pointerdown', syncMusic, { once: true });
   new ResizeObserver(scene.resize).observe(cv);
   scene.resize();
 
   native.watchLifecycle(onHide, onShow);
-  native.watchBackButton(ui.activeTab, () => { ui.selectTab('fleet'); refresh(); });
+  native.watchBackButton(ui.activeTab, () => { ui.selectTab('fleet'); refresh(); }, ui.closeJournal);
   native.setupChrome();
 
   const now = Date.now();
@@ -345,9 +407,11 @@ async function boot() {
 
   // Store first (it can restore "Remove ads" on a new phone), then ads. None of this blocks play; failure just hides the buttons.
   (async () => {
-    await store.initStore();
-    ui.setShopVisible(store.storeAvailable() || native.isNative()); // on Android always show it; items read "Unavailable" until Play has them
-    await syncPurchases(false);
+    if (shopOn()) {
+      await store.initStore();
+      ui.setShopVisible(store.storeAvailable() || native.isNative()); // on Android always show it; items read "Unavailable" until Play has them
+      await syncPurchases(false);
+    }
     if (!L.adsRemoved(S)) {
       await ads.initAds();
       if (!L.adsRemoved(S)) await ads.showBanner();

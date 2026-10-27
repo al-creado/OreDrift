@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
     <meta name="theme-color" content="#0b1020" />
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%277%27 fill=%27%230b1020%27/%3E%3Cpath d=%27M7 18 11 9l9-2 6 8-3 9-10 1z%27 fill=%27%23464c68%27/%3E%3Cpath d=%27M11 17l5-4 5 3%27 stroke=%27%23f2a24e%27 stroke-width=%272%27 fill=%27none%27/%3E%3C/svg%3E" />
     <title>Ore Drift</title>
@@ -16,7 +16,7 @@
       </div></header>
 
       <section class="stage">
-        <canvas id="cv" tabindex="0" role="img" aria-label="Asteroid. Tap it, or press space, to mine ore. Press C to catch a passing comet."></canvas>
+        <canvas id="cv" tabindex="0" role="img" aria-label="Asteroid. Tap it, or press space, to mine ore. Press C to catch a passing comet or supply ship."></canvas>
         <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
         <div class="offer" id="offer" hidden>
           <span id="offer-text"></span>
@@ -62,9 +62,14 @@
             </div>
             <div class="sect">
               <div class="row"><h2>Commendations</h2><span class="pts" id="achcount">0</span></div>
+              <p class="note" id="achrank"></p>
               <p class="note" id="achnote"></p>
-              <div class="alist" id="achs"></div>
-            </div>
+              <div class="seg" id="achseg" role="group" aria-label="Commendation view">
+                <button type="button" data-v="type" aria-pressed="true">By type</button>
+                <button type="button" data-v="next" aria-pressed="false">Next up</button>
+                <button type="button" data-v="done" aria-pressed="false">Earned</button>
+              </div>
+              <div class="alist" id="achs"></div>            </div>
           </div>
         </section>
 
@@ -83,10 +88,28 @@
           <div class="in list">
             <div class="sect">
               <h2>Relocate</h2>
-              <p class="note">Leave this belt for a richer one. You lose your ore, fleet and upgrades, and keep survey points. Each point adds 10% to every vessel and every tap.</p>
+              <p class="note" id="beltname"></p>
+              <p class="note">Leave this belt for a richer one. Every survey point permanently adds 10% to all your output and taps.</p>
               <div class="row"><span class="label">Survey points</span><span class="pts" id="pts">0</span></div>
-              <button class="btn primary" id="relocate" type="button" disabled>Relocate</button>
+              <div class="rl-gain" id="rl-gain"></div>
+              <div class="track"><div class="fill" id="rl-fill"></div></div>
               <p class="note" id="relnote"></p>
+              <div class="rl-detail" id="rl-detail" hidden>
+                <dl class="stats">
+                  <dt>Survey points</dt><dd id="rl-pts"></dd>
+                  <dt>Survey bonus</dt><dd id="rl-sb"></dd>
+                  <dt>All output and taps</dt><dd id="rl-total"></dd>
+                  <dt>Belt</dt><dd id="rl-belt"></dd>
+                </dl>
+                <p class="note"><strong>You lose:</strong> <span id="rl-lose"></span></p>
+                <p class="note"><strong>You keep:</strong> survey points, commendations, lifetime ore, relocations, missions and streak, and shop purchases.</p>
+              </div>
+              <button class="btn primary" id="relocate" type="button" disabled>Relocate</button>
+            </div>
+            <div class="sect">
+              <h2>Captain's journal</h2>
+              <p class="note" id="jnote"></p>
+              <button class="btn" id="journal-open" type="button">Read the journal <span class="newpill" id="jnew" hidden>New</span></button>
             </div>
             <div class="sect">
               <h2>Logbook</h2>
@@ -96,15 +119,17 @@
                 <dt>Taps</dt><dd id="st-taps">0</dd>
                 <dt>Vessels</dt><dd id="st-fleet">0</dd>
                 <dt>Relocations</dt><dd id="st-runs">0</dd>
-                <dt>Comets caught</dt><dd id="st-comets">0</dd>
+                <dt>Comets and ships caught</dt><dd id="st-comets">0</dd>
                 <dt>Missions done</dt><dd id="st-missions">0</dd>
                 <dt>Best supply streak</dt><dd id="st-best">0 days</dd>
                 <dt>Commendations</dt><dd id="st-ach">0</dd>
+                <dt>Rank</dt><dd id="st-rank">Rookie</dd>
               </dl>
             </div>
             <div class="sect">
               <h2>Settings</h2>
-              <div class="row"><span>Sound</span><button class="btn" id="snd" type="button" aria-pressed="true">On</button></div>
+              <div class="row"><span>Sound effects</span><button class="btn" id="snd" type="button" aria-pressed="true">On</button></div>
+              <div class="row"><span>Music</span><button class="btn" id="mus" type="button" aria-pressed="true">On</button></div>
               <div id="notify-row" class="row" hidden><span>Reminders</span><button class="btn" id="notify" type="button" aria-pressed="false">Off</button></div>
               <div id="adprivacy-row" class="row" hidden><span>Ad privacy choices</span><button class="btn" id="adprivacy" type="button">Open</button></div>
               <button class="btn danger" id="wipe" type="button">Wipe save</button>
@@ -122,9 +147,22 @@
         <button type="button" role="tab" aria-selected="true" data-tab="fleet">Fleet</button>
         <button type="button" role="tab" aria-selected="false" data-tab="ups">Upgrades<span class="badge" id="b-ups" hidden></span></button>
         <button type="button" role="tab" aria-selected="false" data-tab="goals">Goals<span class="badge" id="b-goals" hidden></span></button>
-        <button type="button" role="tab" aria-selected="false" data-tab="shop" id="nav-shop" hidden>Shop</button>
         <button type="button" role="tab" aria-selected="false" data-tab="belt">Belt<span class="badge" id="b-belt" hidden></span></button>
+        <button type="button" role="tab" aria-selected="false" data-tab="shop" id="nav-shop" hidden>Shop</button>
       </nav>
+    </div>
+    <div class="journal" id="journal" role="dialog" aria-modal="true" aria-label="Captain's journal" hidden>
+      <div class="jhead"><h2>Captain's journal</h2><button class="jx" id="journal-close" type="button" aria-label="Close the journal">✕</button></div>
+      <div class="jbody" id="jbody"></div>
+    </div>
+    <div class="achpop" id="achpop" role="status" aria-live="polite" hidden>
+      <div class="ico" id="achpop-ico">★</div>
+      <div class="txt">
+        <div class="kicker" id="achpop-kicker"></div>
+        <div class="nm"><span id="achpop-name"></span><span class="tier" id="achpop-tier"></span></div>
+        <div class="sub" id="achpop-sub"></div>
+        <div class="rw" id="achpop-reward"></div>
+      </div>
     </div>
     <script type="module" src="/src/main.js"></script>
   </body>

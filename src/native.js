@@ -45,9 +45,10 @@ export function watchLifecycle(onHide, onShow) {
 }
 
 /** From a non-Fleet tab go to Fleet; on Fleet exit the app. */
-export function watchBackButton(getTab, goFleet) {
+export function watchBackButton(getTab, goFleet, closeOverlay) {
   if (!isNative()) return;
   App.addListener('backButton', () => {
+    if (closeOverlay && closeOverlay()) return; // an open page (like the journal) closes first
     if (getTab() !== 'fleet') goFleet();
     else App.exitApp();
   });

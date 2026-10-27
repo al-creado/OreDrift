@@ -1,15 +1,16 @@
 /* DOM building and updating: HUD, tabs, cards, goals, toasts. Reads state, never changes rules. */
-import { GENS, UPS, ACHS, MILESTONES, FRENZY_MULT, ACH_BONUS, PRODUCTS } from './data.js';
+import { GENS, UPS, ACHS, MILESTONES, FRENZY_MULT, PRODUCTS, ACH_GROUPS, TIER_NAMES, RANKS, JOURNAL } from './data.js';
 import * as L from './logic.js';
+import { beltFor } from './belts.js';
 
 const $ = (id) => document.getElementById(id);
 const setText = (el, s) => { if (el.textContent !== s) el.textContent = s; };
 
 /**
  * h: { getState(), onBuy(gen, mode), onBuyUp(up), onClaimMission(i), onClaimChest(), onClaimSupply(),
- *      onRelocate(), onWipe(), onToggleSound(), onToggleNotify?(), version?,
+ *      onRelocate(), onWipe(), onToggleSound(), onToggleMusic(), onToggleNotify?(), version?,
  *      podInfo(now) -> null | { reward, waitMs, free }, onWatchPod(), onOpenAdPrivacy?(),
- *      priceOf(id), onBuyProduct(product), onRestore(), isBusy() }
+ *      priceOf(id), onBuyProduct(product), onRestore(), isBusy(), onOpenJournal() }
  */
 export function createUI(h) {
   let buyMode = 1;
@@ -31,6 +32,74 @@ export function createUI(h) {
     toastBusy = true; t.textContent = n[0]; t.hidden = false;
     t.style.animation = 'none'; void t.offsetWidth; t.style.animation = '';
     toastTimer = setTimeout(nextToast, toastQ.length ? Math.min(n[1], 3500) : n[1]);
+  }
+
+  /* ---------- the Captain's journal ---------- */
+  function buildJournal(s, seen) {
+    const host = $('jbody'); host.textContent = '';
+    JOURNAL.forEach((c, i) => {
+      const open = L.statValue(s, c.stat) >= c.t;
+      const el = document.createElement('article'); el.className = 'chapter' + (open ? '' : ' locked');
+      const num = document.createElement('p'); num.className = 'jnum'; num.textContent = 'Chapter ' + (i + 1);
+      const title = document.createElement('h3'); title.textContent = open ? c.title : 'Locked';
+      if (open && i >= seen) { const n = document.createElement('span'); n.className = 'newpill'; n.textContent = 'New'; title.appendChild(n); }
+      el.append(num, title);
+      if (open) c.text.forEach((t) => { const p = document.createElement('p'); p.textContent = t; el.appendChild(p); });
+      else { const r = document.createElement('p'); r.className = 'jreq'; r.textContent = c.req; el.appendChild(r); }
+      host.appendChild(el);
+    });
+  }
+  function openJournal() {
+    const s = S();
+    buildJournal(s, s.journalSeen); // chapters not seen before carry a NEW pill
+    $('journal').hidden = false; $('jbody').scrollTop = 0;
+    h.onOpenJournal(); // marks everything unlocked as seen
+  }
+  /** Returns true if the journal was open (so the back button knows it handled the press). */
+  function closeJournal() {
+    if ($('journal').hidden) return false;
+    $('journal').hidden = true;
+    return true;
+  }
+
+  /* ---------- commendation banner ---------- */
+  // Tier colours: Bronze, Silver, Gold, Platinum, each with a matching soft glow.
+  const TIER_LOOK = [['#d58a5a', 'rgba(213,138,90,.45)'], ['#c3cadb', 'rgba(195,202,219,.4)'], ['#f2c14e', 'rgba(242,193,78,.5)'], ['#8fe3ff', 'rgba(143,227,255,.45)']];
+  const achQ = [];
+  let achBusy = false, achTimer = 0;
+  const ACH_SHOW_MS = 4200;
+
+  /** item: { kicker, name, tier (1..5), sub?, reward } */
+  function achPop(item) {
+    if (achQ.length >= 8) achQ.shift();
+    achQ.push(item);
+    if (!achBusy) nextAchPop();
+  }
+  function nextAchPop() {
+    const pop = $('achpop'), item = achQ.shift();
+    clearTimeout(achTimer);
+    if (!item) {
+      achBusy = false; pop.classList.remove('show');
+      achTimer = setTimeout(() => { if (!achBusy) pop.hidden = true; }, 600);
+      return;
+    }
+    achBusy = true;
+    const t = Math.min(4, item.tier || 1), look = TIER_LOOK[t - 1];
+    pop.style.setProperty('--tier', look[0]); pop.style.setProperty('--glow', look[1]);
+    $('achpop-kicker').textContent = item.kicker;
+    $('achpop-name').textContent = item.name;
+    $('achpop-tier').textContent = item.many ? '' : TIER_NAMES[t - 1];
+    $('achpop-sub').textContent = item.sub || '';
+    $('achpop-reward').textContent = item.reward;
+    pop.hidden = false;
+    pop.classList.remove('show'); void pop.offsetWidth; // restart the slide-in
+    pop.classList.add('show');
+    achTimer = setTimeout(hideAchPop, ACH_SHOW_MS);
+  }
+  function hideAchPop() {
+    clearTimeout(achTimer);
+    $('achpop').classList.remove('show');
+    achTimer = setTimeout(nextAchPop, 450); // let it slide out before the next one comes in
   }
 
   /* ---------- fleet ---------- */
@@ -111,26 +180,44 @@ export function createUI(h) {
   /* ---------- belt ---------- */
   function updateBelt(s) {
     if (activeTab !== 'belt') return;
-    const g = L.prestigeGain(s);
+    const pv = L.relocatePreview(s), g = pv.gain;
     setText($('pts'), String(s.points));
+    const chapters = L.journalCount(s);
+    setText($('jnote'), chapters + ' of ' + JOURNAL.length + ' chapters unlocked. A story of the Drift, told as you go.');
+    $('jnew').hidden = chapters <= s.journalSeen;
+    setText($('beltname'), 'Current belt: ' + beltFor(s.runs).name);
     $('relocate').disabled = g < 1;
-    setText($('relnote'), g >= 1
-      ? 'Relocating now earns +' + g + ' survey point' + (g > 1 ? 's' : '') + ' (+' + g * 10 + '%). The next point comes at ' + L.fmt(L.nextPointAt(s)) + ' t this run.'
-      : 'Mine ' + L.fmt(1e6 - s.total) + ' more t this run to earn your first survey point.');
+
+    // What relocating gives (and costs), spelled out.
+    setText($('rl-gain'), g >= 1
+      ? '+' + g + ' survey point' + (g > 1 ? 's' : '') + ': everything you earn ×' + pv.ratio.toFixed(2)
+      : 'Not yet: ' + L.fmt(Math.max(0, pv.nextAt - s.total)) + ' t to go');
+    setFill($('rl-fill'), pv.progress * 100);
+    setText($('relnote'), (g >= 1 ? 'The next survey point' : 'Your first survey point') + ' comes at ' + L.fmt(pv.nextAt) + ' t this run (' + L.fmt(s.total) + ' so far). The bar shows the way there.');
+    $('rl-detail').hidden = g < 1;
+    setText($('rl-pts'), pv.pointsBefore + ' → ' + pv.pointsAfter);
+    setText($('rl-sb'), '+' + pct(pv.surveyBefore) + ' → +' + pct(pv.surveyAfter));
+    setText($('rl-total'), '+' + Math.round(pv.bonusBefore * 100) + '% → +' + Math.round(pv.bonusAfter * 100) + '%');
+    setText($('rl-belt'), beltFor(s.runs).name + ' → ' + beltFor(s.runs + 1).name);
+    const lose = pv.lose;
+    setText($('rl-lose'), L.fmt(lose.ore) + ' t of ore, ' + lose.vessels + ' vessel' + (lose.vessels === 1 ? '' : 's') + ', ' + lose.upgrades + ' upgrade' + (lose.upgrades === 1 ? '' : 's') + ' and this run\'s ' + L.fmt(lose.run) + ' t of progress.');
     setText($('st-all'), L.fmt(s.allTime) + ' t'); setText($('st-run'), L.fmt(s.total) + ' t');
     setText($('st-taps'), s.taps.toLocaleString('en-US'));
     setText($('st-fleet'), String(L.fleetCount(s)));
     setText($('st-runs'), String(s.runs));
     setText($('st-comets'), String(s.stats.comets)); setText($('st-missions'), String(s.stats.missions));
     setText($('st-best'), s.stats.best + (s.stats.best === 1 ? ' day' : ' days')); setText($('st-ach'), L.achCount(s) + ' of ' + ACHS.length);
+    setText($('st-rank'), L.rankFor(L.achCount(s)).name);
     setText($('snd'), s.sound ? 'On' : 'Off'); $('snd').setAttribute('aria-pressed', String(s.sound));
+    setText($('mus'), s.music ? 'On' : 'Off'); $('mus').setAttribute('aria-pressed', String(s.music));
     const nb = $('notify');
     if (!$('notify-row').hidden) { setText(nb, s.notify ? 'On' : 'Off'); nb.setAttribute('aria-pressed', String(!!s.notify)); }
   }
 
   /* ---------- goals ---------- */
   const G = { dots: [], m: [] }, achEls = [];
-  let achKey = -1;
+  let achKey = '', achView = 'type'; // view: next (closest to done), type (grouped), done (earned)
+  const freshAch = new Set(); // earned this session; shown with a NEW pill until the Goals tab is left
   function buildGoals() {
     const dots = $('dots'); dots.textContent = ''; G.dots = [];
     for (let i = 1; i <= 7; i++) {
@@ -154,23 +241,92 @@ export function createUI(h) {
     const w = Math.max(0, Math.min(100, p)) + '%';
     if (el.style.width !== w) el.style.width = w;
   }
+  /* ---------- commendations: one tile per chain (Bronze, Silver, Gold...) ---------- */
+  const tierOf = (a) => Math.min(4, a.tier);
+  const pct = (x) => Number((x * 100).toFixed(1)) + '%';
+  const ratio = (s, a) => Math.min(1, L.achValue(s, a) / a.t);
+  const chainOrder = (x, y) => ACH_GROUPS.indexOf(x.group) - ACH_GROUPS.indexOf(y.group) || L.CHAINS.indexOf(x) - L.CHAINS.indexOf(y);
+
+  /** Which chains the current view lists, in order. */
+  function achList(s) {
+    const shown = L.CHAINS.filter((c) => !L.chainHidden(s, c));
+    if (achView === 'done') return shown.filter((c) => L.chainState(s, c).earnedCount > 0).sort(chainOrder);
+    if (achView === 'type') return L.CHAINS.slice().sort(chainOrder); // includes hidden secrets, drawn as "?" cards
+    return shown.filter((c) => !L.chainState(s, c).complete)
+      .sort((x, y) => ratio(s, L.chainState(s, y).next) - ratio(s, L.chainState(s, x).next)).slice(0, 10);
+  }
+
   function buildAch(s) {
     const host = $('achs'); host.textContent = ''; achEls.length = 0;
-    const ratio = (a) => Math.min(1, L.achValue(s, a) / a.t);
-    const list = ACHS.slice().sort((a, b) => {
-      const ua = s.ach[a.id] ? 1 : 0, ub = s.ach[b.id] ? 1 : 0;
-      if (ua !== ub) return ua - ub;
-      return ua ? 0 : ratio(b) - ratio(a);
-    });
-    list.forEach((a) => {
+    const list = achList(s), grouped = achView !== 'next';
+    let lastGroup = '';
+    if (!list.length) {
+      const e = document.createElement('div'); e.className = 'empty';
+      e.textContent = achView === 'done' ? 'Nothing earned yet. Keep mining!' : 'Every visible commendation is complete.';
+      host.appendChild(e);
+    }
+    list.forEach((chain) => {
+      if (grouped && chain.group !== lastGroup) {
+        lastGroup = chain.group;
+        const g = document.createElement('h3'); g.className = 'grp'; g.textContent = chain.group; host.appendChild(g);
+      }
+      if (L.chainHidden(s, chain)) {
+        // A secret one nobody has earned yet: a placeholder that gives nothing away.
+        const m = document.createElement('article'); m.className = 'card ach mystery';
+        m.innerHTML = '<div class="count">?</div><div class="info"><h3 class="name"><span class="nm">???</span><span class="tier secret">Secret</span></h3><p class="desc">Keep playing to discover it.</p></div>';
+        host.appendChild(m);
+        return;
+      }
       const el = document.createElement('article'); el.className = 'card ach';
-      el.innerHTML = '<div class="count"></div><div class="info"><h3 class="name"></h3><p class="desc"></p><div class="track"><div class="fill"></div></div><p class="meta"></p></div>';
-      el.querySelector('.name').textContent = a.name; el.querySelector('.desc').textContent = a.desc;
+      el.innerHTML = '<div class="count"></div><div class="info"><h3 class="name"><span class="nm"></span><span class="tier"></span><span class="tier secret" hidden>Secret</span><span class="newpill" hidden>New</span></h3><p class="chainline"><span class="ctitle"></span><span class="pips"></span></p><p class="desc"></p><div class="track"><div class="fill"></div></div><p class="meta"></p><p class="earned"></p></div>';
+      el.querySelector('.ctitle').textContent = chain.title;
+      const pips = [...chain.steps.map((step) => {
+        const p = document.createElement('span'); p.className = 'pip t' + tierOf(step); p.title = step.name;
+        el.querySelector('.pips').appendChild(p); return p;
+      })];
+      el.querySelector('.chainline').hidden = chain.steps.length < 2; // a single secret tile has no tiers to show
+      el.querySelector('.secret').hidden = !chain.secret;
       host.appendChild(el);
-      achEls.push({ a, root: el, mark: el.querySelector('.count'), track: el.querySelector('.track'), fill: el.querySelector('.fill'), meta: el.querySelector('.meta') });
+      achEls.push({
+        chain, root: el, pips, mark: el.querySelector('.count'), nm: el.querySelector('.nm'), chip: el.querySelector('.tier'),
+        desc: el.querySelector('.desc'), track: el.querySelector('.track'), fill: el.querySelector('.fill'),
+        meta: el.querySelector('.meta'), earned: el.querySelector('.earned'), pill: el.querySelector('.newpill'),
+      });
     });
-    achKey = L.achCount(s);
+    achKey = achView + '|' + L.achCount(s);
   }
+
+  function updateAch(s) {
+    const n = L.achCount(s), rank = L.rankFor(n), nextRank = RANKS.find((r) => r.min > n);
+    if (achKey !== achView + '|' + n) buildAch(s);
+    setText($('achcount'), n + ' / ' + ACHS.length);
+    setText($('achrank'), 'Rank: ' + rank.name + (nextRank ? '. Next: ' + nextRank.name + ' at ' + nextRank.min + ' (' + (nextRank.min - n) + ' to go).' : '. The highest rank.'));
+    setText($('achnote'), 'Each tier you reach gives a permanent output and tap bonus (+1% for the first 32, +0.5% for the rest) and a one-time ore gift. They stay through relocations. Current bonus: +' + pct(L.achBonusTotal(s)) + '.');
+    achEls.forEach((e) => {
+      const st = L.chainState(s, e.chain), a = st.next || st.last;
+      e.root.classList.toggle('done', st.complete);
+      e.pips.forEach((p, i) => p.classList.toggle('on', i < st.earnedCount));
+      setText(e.nm, a.name);
+      setText(e.chip, st.complete ? 'Complete' : TIER_NAMES[tierOf(a) - 1]);
+      e.chip.className = 'tier ' + (st.complete ? 'tc' : 't' + tierOf(a));
+      setText(e.desc, st.complete ? 'Every tier earned.' : a.desc);
+      e.track.hidden = st.complete;
+      e.pill.hidden = !e.chain.steps.some((x) => freshAch.has(x.id));
+      const earnedNames = e.chain.steps.filter((x) => s.ach[x.id]).map((x) => '✓ ' + x.name);
+      setText(e.earned, st.earnedCount && !st.complete ? earnedNames.join('   ') : (st.complete ? earnedNames.join('   ') : ''));
+      e.earned.hidden = !st.earnedCount;
+      if (st.complete) {
+        setText(e.mark, '✓'); setText(e.meta, '');
+      } else {
+        const v = Math.min(L.achValue(s, a), a.t);
+        setText(e.mark, Math.floor(100 * v / a.t) + '%');
+        setText(e.meta, L.fmt(v) + ' / ' + L.fmt(a.t) + '\nTier ' + (st.earnedCount + 1) + ' of ' + st.total + '. Reward: +' + pct(L.achBonus(a)) + ' output and about ' + L.fmt(L.achGiftAmount(s, a)) + ' t');
+        setFill(e.fill, 100 * v / a.t);
+      }
+    });
+  }
+  /** Marks commendations earned just now, so they carry a NEW pill (and the Goals tab a dot) until the player has seen them. */
+  function markNew(ids) { ids.forEach((id) => freshAch.add(id)); achKey = ''; }
   function updateGoals(s, date) {
     const D = s.daily; if (!D) return;
     const sh = L.shownStreak(s, date), can = L.canSupply(s, date), nx = Math.min(L.nextStreak(s, date), 7), f = L.supplyFactor(L.nextStreak(s, date));
@@ -200,19 +356,9 @@ export function createUI(h) {
     else if (all) setBtn(cc, true, 'Open', '+' + L.fmt(cr));
     else setBtn(cc, false, 'Locked', '');
 
-    if (achKey !== L.achCount(s)) buildAch(s);
-    const n = L.achCount(s);
-    setText($('achcount'), n + ' / ' + ACHS.length);
-    setText($('achnote'), 'Each commendation adds +' + Math.round(ACH_BONUS * 100) + '% to all output and taps, and stays through relocations. Current bonus: +' + Math.round(n * ACH_BONUS * 100) + '%.');
-    achEls.forEach((e) => {
-      const done = !!s.ach[e.a.id], v = Math.min(L.achValue(s, e.a), e.a.t);
-      e.root.classList.toggle('done', done); e.track.hidden = done;
-      setText(e.mark, done ? '✓' : Math.floor(100 * v / e.a.t) + '%');
-      setText(e.meta, done ? '' : L.fmt(v) + ' / ' + L.fmt(e.a.t));
-      if (!done) setFill(e.fill, 100 * v / e.a.t);
-    });
+    updateAch(s);
   }
-  const resetAchList = () => { achKey = -1; };
+  const resetAchList = () => { achKey = ''; freshAch.clear(); };
 
   /* ---------- cargo pod (rewarded ad) ---------- */
   function updatePod(s, date) {
@@ -284,13 +430,15 @@ export function createUI(h) {
     if (activeTab === 'shop') updateShop(s);
     updateBelt(s);
     $('b-ups').hidden = !L.visibleUps(s).some((u) => s.ore >= u.cost);
-    $('b-goals').hidden = !L.goalsReady(s, date);
-    $('b-belt').hidden = L.prestigeGain(s) < 1;
+    $('b-goals').hidden = !(L.goalsReady(s, date) || (freshAch.size > 0 && activeTab !== 'goals'));
+    $('b-belt').hidden = !(L.prestigeGain(s) >= 1 || L.journalCount(s) > s.journalSeen);
   }
 
   /* ---------- tabs and controls ---------- */
   const TABS = ['fleet', 'ups', 'goals', 'shop', 'belt'];
   function selectTab(name) {
+    if (activeTab === 'goals' && name !== 'goals') { freshAch.clear(); achKey = ''; } // seen now
+    if (name === 'goals') achKey = ''; // rebuild so "Next up" is current
     activeTab = name;
     document.querySelectorAll('.nav button').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tab === name)));
     TABS.forEach((t) => { $('tab-' + t).hidden = t !== name; });
@@ -313,8 +461,18 @@ export function createUI(h) {
     document.querySelectorAll('.nav button').forEach((b) => b.addEventListener('click', () => { selectTab(b.dataset.tab); h.onRefresh(); }));
     confirmable($('relocate'), 'Relocate', 'Tap again to relocate', h.onRelocate);
     confirmable($('wipe'), 'Wipe save', 'Tap again to wipe', h.onWipe);
+    document.querySelectorAll('#achseg button').forEach((b) => b.addEventListener('click', () => {
+      achView = b.dataset.v; achKey = '';
+      document.querySelectorAll('#achseg button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+      h.onRefresh();
+    }));
     $('snd').addEventListener('click', h.onToggleSound);
+    $('mus').addEventListener('click', h.onToggleMusic);
     $('toast').addEventListener('click', nextToast);
+    $('achpop').addEventListener('click', hideAchPop);
+    $('journal-open').addEventListener('click', openJournal);
+    $('journal-close').addEventListener('click', closeJournal);
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeJournal(); });
     if (h.version) setText($('version'), h.version);
     $('pod-btn').addEventListener('click', () => h.onWatchPod());
     $('offer-go').addEventListener('click', () => { if (offerGo) offerGo(); });
@@ -324,7 +482,7 @@ export function createUI(h) {
   }
 
   return {
-    init, update, updateOre, toast, showOffer, hideOffer, setShopVisible, setAdPrivacy: (on) => { $('adprivacy-row').hidden = !on; }, selectTab, resetUpgradeList, resetAchList,
+    init, update, updateOre, toast, achPop, closeJournal, showOffer, hideOffer, markNew, setShopVisible, setAdPrivacy: (on) => { $('adprivacy-row').hidden = !on; }, selectTab, resetUpgradeList, resetAchList,
     activeTab: () => activeTab,
   };
 }

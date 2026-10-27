@@ -23,10 +23,10 @@ Tap a glowing asteroid and start mining. Hire drones, laser rigs and orbital fou
 - Tap the asteroid to mine ore. Every tap counts.
 - Hire seven kinds of automatic miners, from a small Mining Drone to a Stellar Collector. Each one doubles its output when you own 10, 25, 50, 100, 150 and 200 of it.
 - Install nine upgrades that boost taps and your whole fleet.
-- Catch passing comets for a burst of x7 output or a cargo pod of ore.
+- Catch passing supply ships for a temporary x7 output boost, and comets for a random pile of ore.
 - Collect a daily supply drop. Come back on consecutive days for bigger rewards, up to two and a half times the base.
 - Finish three new daily missions, then open the daily cache.
-- Earn 32 commendations. Each one adds a permanent +1% to everything.
+- Earn 69 commendations, from Bronze to Platinum, with eight secret ones to discover. Read the Captain's journal, a story of the Drift that unlocks chapter by chapter (and may drop a hint or two). Each gives a permanent output bonus and a one-time ore gift, and they raise your rank from Rookie to Legend.
 - Relocate to a new belt to earn survey points. Each point adds +10% to all output and taps, and you keep them forever.
 
 **Made to fit your day**
@@ -35,7 +35,7 @@ Tap a glowing asteroid and start mining. Hire drones, laser rigs and orbital fou
 - Optional reminders when your supply drop is ready, your hold is full or your cargo pod is ready. They are off until you turn them on.
 - Free to play with ads. A one-time "Remove ads" purchase removes the banner and makes the ad bonuses free.
 - Optional shop: ore packs, a one-time starter bundle and a permanent +25% boost. Nothing random, and nothing is required to progress.
-- Portrait play with large touch targets, sound and vibration you can switch off, and reduced motion support.
+- Slow space-ambient background music, and portrait play with large touch targets. Music and sound effects can each be switched off, and reduced motion is supported.
 
 Ore Drift is a slow, steady idle game. Check in for a minute, spend your ore, and let the belt do the rest.
 

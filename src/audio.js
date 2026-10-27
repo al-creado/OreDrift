@@ -5,9 +5,8 @@ let enabled = true;
 
 export function setSoundEnabled(on) { enabled = !!on; }
 
-/** The context is created lazily on the first call, which happens inside a user tap. */
-function ctx() {
-  if (!enabled) return null;
+/** The shared context (music uses it too). Created lazily, which must happen inside a user tap. */
+export function audioContext() {
   try {
     actx = actx || new (window.AudioContext || window.webkitAudioContext)();
     if (actx.state === 'suspended') actx.resume();
@@ -15,6 +14,11 @@ function ctx() {
   } catch (e) {
     return null;
   }
+}
+
+/** The context for sound effects, or null while sound effects are switched off. */
+function ctx() {
+  return enabled ? audioContext() : null;
 }
 
 export function blip(freq, dur, vol, type) {
@@ -51,5 +55,8 @@ export const sounds = {
   // A comet has appeared: a short rising three-note chime, then a soft ping every second or so while it is on screen.
   cometSpawn: () => chime([[880, 0.14, 0.05, 0], [1175, 0.14, 0.05, 120], [1568, 0.24, 0.05, 240]], 'sine'),
   cometPing: () => blip(1568, 0.09, 0.03, 'sine'),
+  // A supply ship is passing: a lower two-tone horn, then a soft double beep, so it sounds different from a comet.
+  shipSpawn: () => chime([[330, 0.28, 0.05, 0], [440, 0.4, 0.05, 220]], 'triangle'),
+  shipPing: () => chime([[660, 0.07, 0.03, 0], [660, 0.07, 0.03, 140]], 'triangle'),
   achievement: () => chime([[600, 0.12, 0.05, 0], [900, 0.2, 0.05, 100]]),
 };

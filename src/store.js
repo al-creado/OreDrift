@@ -16,6 +16,7 @@ let available = false;
 let mockHeld = []; // what the pretend store says the player owns
 
 export const storeAvailable = () => available;
+export const isMock = () => MOCK;
 export const priceOf = (id) => prices[id] || '';
 
 export async function initStore() {

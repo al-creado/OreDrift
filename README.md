@@ -51,7 +51,10 @@ src/
   store.js      Google Play Billing: shop purchases and restore
   ui.js         DOM building and updating, tabs, toasts
   scene.js      canvas: asteroid, ships, comet, particles
-  audio.js      synthesized sounds
+  belts.js      the look of each belt (colours, shape, ring) and which ships orbit it
+  ships.js      the silhouette of each vessel type
+  audio.js      synthesized sound effects (shared Web Audio context)
+  music.js      slow space-ambient background music, synthesized
   main.js       boot, game loop, wiring
 tests/          Vitest suites and the pacing simulator
 reference/      the original web prototype the game was ported from

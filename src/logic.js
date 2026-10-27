@@ -5,7 +5,7 @@
  */
 import {
   GENS, UPS, ACHS, MILESTONES, GROWTH, OFFLINE_CAP, OFFLINE_RATE, PRESTIGE_BASE,
-  FRENZY_MULT, FRENZY_MAX_MS, ACH_BONUS, SURVEY_BONUS, MAX_BUY, MISSION_TYPES, TAP_TARGETS,
+  FRENZY_MULT, FRENZY_MAX_MS, ACH_BONUS, ACH_GIFT, RANKS, CHAIN_TITLES, JOURNAL, SURVEY_BONUS, MAX_BUY, MISSION_TYPES, TAP_TARGETS,
   PRODUCTS, BOOST_MULT, GRANTED_KEEP,
 } from './data.js';
 
@@ -53,10 +53,10 @@ export function fmtDur(sec) {
 export function fresh(now = 0) {
   return {
     ore: 0, total: 0, allTime: 0, taps: 0, points: 0, runs: 0,
-    owned: {}, ups: {}, last: now, sound: true, ach: {},
-    stats: { comets: 0, missions: 0, best: 0 },
+    owned: {}, ups: {}, last: now, sound: true, music: true, ach: {},
+    stats: { comets: 0, missions: 0, best: 0, ships: 0, drops: 0, chests: 0, capped: 0, night: 0, bare: 0, bestRun: 0, overdrive: 0 },
     streak: 0, lastSupply: '', daily: null, frenzyUntil: 0, notify: false, podReadyAt: 0,
-    iap: { removeAds: false, starter: false, boost: false }, granted: [],
+    iap: { removeAds: false, starter: false, boost: false }, granted: [], journalSeen: 0,
   };
 }
 
@@ -70,7 +70,10 @@ export function milestoneMult(n) {
 }
 export const surveyMult = (S) => 1 + SURVEY_BONUS * S.points;
 export const achCount = (S) => ACHS.reduce((a, x) => a + (S.ach[x.id] ? 1 : 0), 0);
-export const achMult = (S) => 1 + ACH_BONUS * achCount(S);
+/** Permanent bonus of one commendation: the original 32 give +1%, newer ones +0.5%. */
+export const achBonus = (a) => (a.bonus === undefined ? ACH_BONUS : a.bonus);
+export const achBonusTotal = (S) => ACHS.reduce((t, a) => t + (S.ach[a.id] ? achBonus(a) : 0), 0);
+export const achMult = (S) => 1 + achBonusTotal(S);
 /** One-time shop boost: x1.25 to all output and taps. */
 export const iapMult = (S) => (S.iap && S.iap.boost ? BOOST_MULT : 1);
 export const adsRemoved = (S) => !!(S.iap && S.iap.removeAds);
@@ -161,6 +164,8 @@ export function tap(S, now) {
   const v = tapValue(S, now, ops(S, now));
   gain(S, v);
   S.taps++;
+  const hour = new Date(now).getHours();
+  if (hour >= 2 && hour < 4) S.stats.night++; // taps in the small hours (local time)
   addProg(S, 'tap', 1);
   return v;
 }
@@ -170,17 +175,41 @@ export function applyOffline(S, sec) {
   const s = Math.min(sec, OFFLINE_CAP), g = ops(S) * s * OFFLINE_RATE;
   if (!(g > 0)) return null;
   gain(S, g);
-  return { gain: g, capped: sec > OFFLINE_CAP };
+  const capped = sec > OFFLINE_CAP;
+  if (capped) S.stats.capped++;
+  return { gain: g, capped };
 }
 
 /* ---------- relocate ---------- */
 export const prestigeGain = (S) => Math.floor(Math.sqrt(S.total / PRESTIGE_BASE));
 export const nextPointAt = (S) => Math.pow(prestigeGain(S) + 1, 2) * PRESTIGE_BASE;
 
+/**
+ * What relocating right now would do, for the Belt tab. Does not change S.
+ * bonusBefore/After are the whole "all output and taps" bonus (survey points x commendations x shop boost), as shown in the header.
+ */
+export function relocatePreview(S) {
+  const gain = prestigeGain(S);
+  const lower = gain * gain * PRESTIGE_BASE, upper = (gain + 1) * (gain + 1) * PRESTIGE_BASE;
+  const other = achMult(S) * iapMult(S);
+  const before = surveyMult(S) * other, after = (1 + SURVEY_BONUS * (S.points + gain)) * other;
+  return {
+    gain,
+    pointsBefore: S.points, pointsAfter: S.points + gain,
+    surveyBefore: surveyMult(S) - 1, surveyAfter: SURVEY_BONUS * (S.points + gain),
+    bonusBefore: before - 1, bonusAfter: after - 1,
+    ratio: after / before,
+    progress: Math.max(0, Math.min(1, (S.total - lower) / (upper - lower))), // toward the next survey point
+    nextAt: upper,
+    lose: { ore: S.ore, vessels: fleetCount(S), upgrades: upCount(S), run: S.total },
+  };
+}
+
 /** Mutates S. Returns the points gained (0 = refused). */
 export function relocate(S) {
   const g = prestigeGain(S);
   if (g < 1) return 0;
+  if (upCount(S) === 0) S.stats.bare++; // left without installing a single upgrade
   S.points += g; S.runs++;
   S.ore = 0; S.total = 0; S.owned = {}; S.ups = {};
   return g;
@@ -191,30 +220,100 @@ export const fleetCount = (S) => GENS.reduce((a, g) => a + own(S, g.id), 0);
 export const kindCount = (S) => GENS.filter((g) => own(S, g.id) > 0).length;
 export const upCount = (S) => UPS.filter((u) => S.ups[u.id]).length;
 
+export const maxVessel = (S) => GENS.reduce((m, g) => Math.max(m, own(S, g.id)), 0);
+
 export function statValue(S, stat) {
   switch (stat) {
     case 'taps': return S.taps;
+    case 'tapPower': return tapValue(S, Infinity, ops(S)); // one tap without a frenzy
     case 'allTime': return S.allTime;
+    case 'heldOre': return S.ore;
     case 'fleet': return fleetCount(S);
     case 'kinds': return kindCount(S);
+    case 'maxVessel': return maxVessel(S);
     case 'upgrades': return upCount(S);
     case 'runs': return S.runs;
+    case 'points': return S.points;
     case 'comets': return S.stats.comets;
+    case 'ships': return S.stats.ships;
+    case 'cometsOnly': return Math.max(0, S.stats.comets - S.stats.ships);
     case 'missions': return S.stats.missions;
+    case 'chests': return S.stats.chests;
     case 'best': return S.stats.best;
+    case 'drops': return S.stats.drops;
+    case 'capped': return S.stats.capped;
+    case 'night': return S.stats.night;
+    case 'bare': return S.stats.bare;
+    case 'bestRun': return S.stats.bestRun;
+    case 'overdrive': return S.stats.overdrive;
+    case 'achs': return achCount(S);
     case 'rate': return ops(S);
     default: return 0;
   }
 }
 export const achValue = (S, a) => statValue(S, a.stat);
 
-/** Unlocks any newly met commendations. Mutates S. Returns the newly earned ones. */
+/** Unlocks any newly met commendations. Mutates S. Returns the newly earned ones (in the order earned). */
 export function checkAch(S) {
   const out = [];
-  for (const a of ACHS) {
-    if (!S.ach[a.id] && achValue(S, a) >= a.t) { S.ach[a.id] = true; out.push(a); }
+  // A few passes, because "earn N commendations" can be met by commendations unlocked in this very call.
+  for (let pass = 0; pass < 4; pass++) {
+    let found = false;
+    for (const a of ACHS) {
+      if (!S.ach[a.id] && achValue(S, a) >= a.t) { S.ach[a.id] = true; out.push(a); found = true; }
+    }
+    if (!found) break;
   }
   return out;
+}
+
+/**
+ * The commendation chains (one tile each): { id, title, group, secret, steps } with steps in ascending order.
+ * A secret chain stays hidden until its first tier is earned.
+ */
+export const CHAINS = (() => {
+  const map = new Map();
+  for (const a of ACHS) {
+    if (!map.has(a.chain)) map.set(a.chain, { id: a.chain, title: CHAIN_TITLES[a.chain], group: a.group, secret: true, steps: [] });
+    const c = map.get(a.chain);
+    c.steps.push(a);
+    if (!a.secret) c.secret = false;
+  }
+  for (const c of map.values()) c.steps.sort((x, y) => x.t - y.t);
+  return [...map.values()];
+})();
+
+/** Where the player is in a chain: tiers earned, the tier being worked on (null when complete), and the last earned one. */
+export function chainState(S, chain) {
+  const earned = chain.steps.filter((a) => S.ach[a.id]);
+  return {
+    earnedCount: earned.length, total: chain.steps.length,
+    next: chain.steps.find((a) => !S.ach[a.id]) || null,
+    last: earned.length ? earned[earned.length - 1] : null,
+    complete: earned.length === chain.steps.length,
+  };
+}
+export const chainHidden = (S, chain) => chain.secret && !chain.steps.some((a) => S.ach[a.id]);
+
+/** Hidden until earned. */
+export const isHidden = (S, a) => !!a.secret && !S.ach[a.id];
+
+/** One-time ore gift for earning a commendation: minutes of current output by tier, with a floor. Mutates S. */
+export function achGiftAmount(S, a) {
+  const [min, floor] = ACH_GIFT[Math.min(4, a.tier)];
+  return minutesOfOre(S, min, floor);
+}
+export function claimAchGift(S, a) {
+  const g = achGiftAmount(S, a);
+  gain(S, g, true);
+  return g;
+}
+
+/** Title for a number of commendations earned. */
+export function rankFor(n) {
+  let r = RANKS[0];
+  for (const x of RANKS) if (n >= x.min) r = x;
+  return r;
 }
 
 /* ---------- days, missions, supply drop ---------- */
@@ -275,7 +374,7 @@ export function missionText(m) {
   if (m.type === 'tap') return 'Tap the asteroid ' + fmt(m.target) + ' times';
   if (m.type === 'mine') return 'Mine ' + fmt(m.target) + ' t of ore';
   if (m.type === 'buy') return 'Hire ' + m.target + ' vessels';
-  return 'Catch ' + m.target + ' comets';
+  return 'Catch ' + m.target + ' comets or supply ships';
 }
 
 /** `min` minutes of no-frenzy output, at least `floor`. */
@@ -317,6 +416,7 @@ export function claimChest(S, now) {
   if (!D || D.chest || !D.missions.every((m) => m.claimed)) return 0;
   const g = chestReward(S);
   D.chest = true;
+  S.stats.chests++;
   gain(S, g, true);
   startFrenzy(S, now, 60);
   return g;
@@ -329,25 +429,55 @@ export function claimSupply(S, date) {
   S.streak = streak;
   S.lastSupply = dayKey(date);
   S.stats.best = Math.max(S.stats.best, streak);
+  S.stats.drops++;
   gain(S, reward, true);
   return { reward, streak };
 }
 
-/* ---------- comets ---------- */
+/* ---------- passing flyers: supply ships and comets ---------- */
 export const FIRST_COMET_MS = 25000;
-/** Delay before the next comet, from a 0..1 random value. */
+/** Delay before the next flyer, from a 0..1 random value. */
 export const cometDelayMs = (caught, r) => (caught ? 50 + r * 60 : 40 + r * 50) * 1000;
 
+/** Share of flyers that are supply ships (the rest are comets). */
+export const SUPPLY_SHIP_CHANCE = 0.6;
+/** After this many comets in a row, the next flyer is always a supply ship (no long dry spells). */
+export const GUARANTEE_AFTER = 2;
+
 /**
- * Mutates S. rand1 picks the reward (below 0.7 = frenzy). Returns { kind: 'frenzy', sec } or { kind: 'pod', gain }.
+ * Which flyer appears next: 'ship' (temporary boost) or 'comet' (ore).
+ * `r` is a 0..1 random value; `history` lists the kinds that appeared before, oldest first.
  */
-export function catchCometReward(S, now, rand1) {
+export function pickFlyer(r, history = []) {
+  const tail = history.slice(-GUARANTEE_AFTER);
+  if (tail.length === GUARANTEE_AFTER && tail.every((k) => k === 'comet')) return 'ship';
+  return r < SUPPLY_SHIP_CHANCE ? 'ship' : 'comet';
+}
+
+export const SHIP_BOOST_SECONDS = 30;
+/** A comet pays a random 5 to 25 minutes of current no-frenzy output, at least 300 t. */
+export const COMET_MIN_MINUTES = 5;
+export const COMET_MAX_MINUTES = 25;
+export const COMET_FLOOR = 300;
+
+/** Mutates S. A supply ship brings a temporary boost (output and taps x7). Returns { kind: 'frenzy', sec }. */
+export function catchSupplyShip(S, now) {
+  S.stats.comets++;
+  S.stats.ships++;
+  addProg(S, 'comet', 1);
+  startFrenzy(S, now, SHIP_BOOST_SECONDS);
+  if (S.frenzyUntil - now > 100000) S.stats.overdrive++; // stacked up to over 100 s of boost
+  return { kind: 'frenzy', sec: SHIP_BOOST_SECONDS };
+}
+
+/** Mutates S. A comet drops a random amount of ore; rand is 0..1. Returns { kind: 'ore', gain, minutes }. */
+export function catchComet(S, rand) {
   S.stats.comets++;
   addProg(S, 'comet', 1);
-  if (rand1 < 0.7) { startFrenzy(S, now, 30); return { kind: 'frenzy', sec: 30 }; }
-  const g = minutesOfOre(S, 13, 300);
+  const minutes = COMET_MIN_MINUTES + rand * (COMET_MAX_MINUTES - COMET_MIN_MINUTES);
+  const g = minutesOfOre(S, minutes, COMET_FLOOR);
   gain(S, g, true);
-  return { kind: 'pod', gain: g };
+  return { kind: 'ore', gain: g, minutes };
 }
 
 /* ---------- rewarded ad: cargo pod ---------- */
@@ -415,3 +545,13 @@ export function restoreOwned(S, productId) {
   else if (productId === 'boost_25') S.iap.boost = true;
   else if (productId === 'starter_bundle') S.iap.starter = true;
 }
+
+/* ---------- catch streak (comets and supply ships caught in a row) ---------- */
+/** Records the current run of catches without a miss; the best run is kept. Mutates S. */
+export function noteCatchRun(S, run) {
+  S.stats.bestRun = Math.max(S.stats.bestRun, run);
+}
+
+/* ---------- the Captain's journal ---------- */
+export const journalUnlocked = (S) => JOURNAL.filter((c) => statValue(S, c.stat) >= c.t);
+export const journalCount = (S) => journalUnlocked(S).length;

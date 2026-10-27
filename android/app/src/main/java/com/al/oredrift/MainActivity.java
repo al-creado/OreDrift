@@ -3,6 +3,7 @@ package com.al.oredrift;
 import android.os.Build;
 import android.os.Bundle;
 import android.view.WindowManager;
+import android.webkit.WebSettings;
 
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
@@ -22,6 +23,19 @@ public class MainActivity extends BridgeActivity {
             getWindow().setAttributes(lp);
         }
         hideSystemBars();
+        disableZoom();
+    }
+
+    /**
+     * Pinch-zoom (and with it, a multi-finger touch) can zoom the page so that one-finger drags pan the
+     * zoomed view instead of scrolling the lists. A game has no use for zoom, so turn it off for good.
+     */
+    private void disableZoom() {
+        if (getBridge() == null || getBridge().getWebView() == null) return;
+        WebSettings settings = getBridge().getWebView().getSettings();
+        settings.setSupportZoom(false);
+        settings.setBuiltInZoomControls(false);
+        settings.setDisplayZoomControls(false);
     }
 
     @Override

@@ -6,7 +6,7 @@ const NOW = 2_000_000_000_000;
 const goodSave = () => ({
   ore: 12.5, total: 500, allTime: 9000, taps: 40, points: 2, runs: 1,
   owned: { drone: 5, laser: 2 }, ups: { bits: true }, last: NOW - 60_000, sound: false, notify: true,
-  ach: { t1: true }, stats: { comets: 3, missions: 4, best: 5 }, streak: 3, lastSupply: '2026-03-10',
+  ach: { t1: true }, stats: { comets: 3, missions: 4, best: 5, ships: 2, drops: 6, chests: 1, capped: 1 }, streak: 3, lastSupply: '2026-03-10',
   daily: { day: '2026-03-10', chest: true, missions: [
     { type: 'tap', target: 150, progress: 20, claimed: false },
     { type: 'buy', target: 10, progress: 10, claimed: true },
@@ -23,7 +23,7 @@ describe('parseSave', () => {
     expect(S.owned).toEqual({ drone: 5, laser: 2 });
     expect(S.ups).toEqual({ bits: true });
     expect(S.ach).toEqual({ t1: true });
-    expect(S.stats).toEqual({ comets: 3, missions: 4, best: 5 });
+    expect(S.stats).toEqual({ comets: 3, missions: 4, best: 5, ships: 2, drops: 6, chests: 1, capped: 1, night: 0, bare: 0, bestRun: 0, overdrive: 0 });
     expect(S.daily.missions).toHaveLength(3);
     expect(S.daily.chest).toBe(true);
     expect(parse(serializeState(S, NOW))).toEqual({ ...S, last: NOW });
@@ -69,7 +69,7 @@ describe('parseSave', () => {
     expect(S.owned).toEqual({});
     expect(S.ups).toEqual({});
     expect(S.ach).toEqual({});
-    expect(S.stats).toEqual({ comets: 0, missions: 0, best: 0 });
+    expect(S.stats).toEqual({ comets: 0, missions: 0, best: 0, ships: 0, drops: 0, chests: 0, capped: 0, night: 0, bare: 0, bestRun: 0, overdrive: 0 });
     expect(S.daily).toBeNull();
   });
 
@@ -107,6 +107,23 @@ describe('parseSave', () => {
     expect(parse({ ...goodSave(), iap: 'x', granted: 'y' })).toMatchObject({ iap: { removeAds: false, starter: false, boost: false }, granted: [] });
   });
 
+  it('an older save without the newer stats gets zeros, and ships never exceed flyers caught', () => {
+    const old = parse({ ...goodSave(), stats: { comets: 7, missions: 2, best: 3 } });
+    expect(old.stats).toEqual({ comets: 7, missions: 2, best: 3, ships: 0, drops: 0, chests: 0, capped: 0, night: 0, bare: 0, bestRun: 0, overdrive: 0 });
+    expect(parse({ ...goodSave(), stats: { comets: 3, ships: 50 } }).stats.ships).toBe(3);
+    expect(parse({ ...goodSave(), stats: { comets: 3, ships: -4, drops: 'x', chests: NaN } }).stats).toMatchObject({ ships: 0, drops: 0, chests: 0 });
+  });
+
+  it('reads the journal progress and the newer secret counters', () => {
+    const S = parse({ ...goodSave(), journalSeen: 4, stats: { comets: 5, night: 12, bare: 2, bestRun: 6, overdrive: 1 } });
+    expect(S.journalSeen).toBe(4);
+    expect(S.stats).toMatchObject({ night: 12, bare: 2, bestRun: 6, overdrive: 1 });
+    expect(parse({ ...goodSave(), journalSeen: 999 }).journalSeen).toBe(10); // never more than there are chapters
+    expect(parse({ ...goodSave(), journalSeen: -3 }).journalSeen).toBe(0);
+    expect(parse({ ...goodSave(), journalSeen: 'x' }).journalSeen).toBe(0);
+    expect(parse(goodSave()).journalSeen).toBe(0); // older saves have none
+  });
+
   it('a save from the future cannot create negative time away', () => {
     expect(parse({ ...goodSave(), last: NOW + 1e9 }).last).toBe(NOW);
     expect(parse({ ...goodSave(), last: 'x' }).last).toBe(NOW);
@@ -118,6 +135,9 @@ describe('parseSave', () => {
 
   it('sound defaults on and notify defaults off', () => {
     const S = parse({});
+    expect(S.music).toBe(true);
+    expect(parse({ music: false }).music).toBe(false);
+    expect(parse({ music: 0 }).music).toBe(true);
     expect(S.sound).toBe(true);
     expect(S.notify).toBe(false);
     expect(parse({ sound: 0 }).sound).toBe(true);
