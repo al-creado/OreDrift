@@ -61,7 +61,7 @@ Based on the code as it stands: no analytics, no ads, no account, no network cal
 - Does your app collect or share any of the required user data types? **No**
 - Is all of the user data collected by your app encrypted in transit? Not applicable (nothing is sent)
 - Do you provide a way for users to request that their data be deleted? Not applicable. Players can wipe the save in Settings > Wipe save, or uninstall the app.
-- Privacy policy URL: required even if you collect nothing. Host `store/privacy-policy.html` and paste its address.
+- Privacy policy URL: required even if you collect nothing. Host `docs/index.html` (GitHub Pages serves it from the `/docs` folder) and paste its address.
 - VERIFY: the app declares the `INTERNET` permission because the Capacitor template includes it, but the game does not use it. Play's form asks about data collected, not permissions, so "no data collected" is still accurate. If you want, remove the permission and test that the app still runs.
 - VERIFY: the manifest has `allowBackup="true"`, so Android Auto Backup may copy the save to the player's Google account. The privacy policy says so. Check Google's current Data safety guidance on whether OS-level backup counts as "collected". If you would rather avoid the question, set `android:allowBackup="false"` in `AndroidManifest.xml` (players then lose progress when changing phones).
 - VERIFY: if you later add ads or analytics, update this form and the policy before releasing.
