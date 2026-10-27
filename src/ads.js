@@ -8,12 +8,12 @@
 import { AdMob, RewardAdPluginEvents, AdmobConsentStatus, BannerAdSize, BannerAdPosition, BannerAdPluginEvents } from '@capacitor-community/admob';
 import { isNative } from './native.js';
 
-export const ADS_TESTING = true;
+export const ADS_TESTING = false;
 const TEST_REWARDED_AD_UNIT_ID = 'ca-app-pub-3940256099942544/5224354917'; // Google's official test unit
-const REWARDED_AD_UNIT_ID = ''; // your real rewarded ad unit ID, e.g. ca-app-pub-XXXX/YYYY
+const REWARDED_AD_UNIT_ID = 'ca-app-pub-7489584099500811/8223894273';
 
 const TEST_BANNER_AD_UNIT_ID = 'ca-app-pub-3940256099942544/9214589741'; // Google's official adaptive banner test unit
-const BANNER_AD_UNIT_ID = ''; // your real banner ad unit ID
+const BANNER_AD_UNIT_ID = 'ca-app-pub-7489584099500811/7513659863';
 
 const adId = ADS_TESTING ? TEST_REWARDED_AD_UNIT_ID : REWARDED_AD_UNIT_ID;
 const bannerId = ADS_TESTING ? TEST_BANNER_AD_UNIT_ID : BANNER_AD_UNIT_ID;
