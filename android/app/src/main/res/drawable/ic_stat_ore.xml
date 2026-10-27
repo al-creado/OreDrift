@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Notification status-bar icon: white crystal silhouette. Android tints it, so only the alpha channel matters. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M12.31,2.52L18.91,5.87L12.03,12.13ZM19.22,6.24L20.86,13.36L12.29,12.43ZM20.80,13.88L15.41,21.48L12.21,12.90ZM14.97,21.65L7.47,20.65L11.78,13.09ZM7.05,20.39L3.24,13.88L11.41,12.87ZM3.20,13.38L5.00,7.23L11.34,12.45ZM5.32,6.80L11.87,2.52L11.63,12.12Z" />
+</vector>

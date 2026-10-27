@@ -12,6 +12,10 @@
       "launchShowDuration": 600,
       "launchAutoHide": true,
       "showSpinner": false
+    },
+    "LocalNotifications": {
+      "smallIcon": "ic_stat_ore",
+      "iconColor": "#F0A04B"
     }
   }
 }
