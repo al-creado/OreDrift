@@ -15,8 +15,8 @@ import { sounds, setSoundEnabled } from './audio.js';
 import { loadState, saveState } from './storage.js';
 import * as native from './native.js';
 
-/* Set to the hosted policy page before publishing; the link only shows when this is non-empty. */
-const PRIVACY_URL = '';
+/* Hosted privacy policy (GitHub Pages, from docs/). The Settings link only shows when this is non-empty. */
+const PRIVACY_URL = 'https://al-creado.github.io/OreDrift/';
 const SAVE_EVERY_MS = 5000;
 
 const $ = (id) => document.getElementById(id);
