@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0b1020" />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%277%27 fill=%27%230b1020%27/%3E%3Cpath d=%27M7 18 11 9l9-2 6 8-3 9-10 1z%27 fill=%27%23464c68%27/%3E%3Cpath d=%27M11 17l5-4 5 3%27 stroke=%27%23f2a24e%27 stroke-width=%272%27 fill=%27none%27/%3E%3C/svg%3E" />
+    <title>Ore Drift</title>
+  </head>
+  <body>
+    <div class="app">
+      <header class="hud"><div class="in">
+        <div class="label">Ore in hold</div>
+        <div class="ore-row"><span class="ore" id="ore">0</span><span class="unit" title="tonnes">t</span></div>
+        <div class="rates"><span id="rate">+0 t/s</span><span id="tapv">tap +1</span><span class="pill" id="bonus" hidden title="Survey points and commendations"></span><span class="pill hot" id="frenzy" hidden></span></div>
+      </div></header>
+
+      <section class="stage">
+        <canvas id="cv" tabindex="0" role="img" aria-label="Asteroid. Tap it, or press space, to mine ore. Press C to catch a passing comet."></canvas>
+        <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+      </section>
+
+      <main class="panes">
+        <section class="scroll" id="tab-fleet" role="tabpanel" aria-label="Fleet">
+          <div class="bar"><div class="in">
+            <span class="label">Buy</span>
+            <div class="seg" id="seg">
+              <button type="button" data-m="1" aria-pressed="true">×1</button>
+              <button type="button" data-m="10" aria-pressed="false">×10</button>
+              <button type="button" data-m="max" aria-pressed="false">Max</button>
+            </div>
+          </div></div>
+          <div class="in list" id="fleet"></div>
+        </section>
+
+        <section class="scroll" id="tab-ups" role="tabpanel" aria-label="Upgrades" hidden>
+          <div class="in list" id="ups"></div>
+        </section>
+
+        <section class="scroll" id="tab-goals" role="tabpanel" aria-label="Goals" hidden>
+          <div class="in list">
+            <div class="sect">
+              <h2>Daily supply drop</h2>
+              <div class="dots" id="dots" role="img" aria-label="Seven day supply streak"></div>
+              <p class="note" id="supnote"></p>
+              <button class="btn primary" id="supply-btn" type="button">Claim</button>
+            </div>
+            <div class="sect">
+              <div class="row"><h2>Daily missions</h2><span class="label" id="reset"></span></div>
+              <div class="mlist" id="missions"></div>
+            </div>
+            <div class="sect">
+              <div class="row"><h2>Commendations</h2><span class="pts" id="achcount">0</span></div>
+              <p class="note" id="achnote"></p>
+              <div class="alist" id="achs"></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="scroll" id="tab-belt" role="tabpanel" aria-label="Belt" hidden>
+          <div class="in list">
+            <div class="sect">
+              <h2>Relocate</h2>
+              <p class="note">Leave this belt for a richer one. You lose your ore, fleet and upgrades, and keep survey points. Each point adds 10% to every vessel and every tap.</p>
+              <div class="row"><span class="label">Survey points</span><span class="pts" id="pts">0</span></div>
+              <button class="btn primary" id="relocate" type="button" disabled>Relocate</button>
+              <p class="note" id="relnote"></p>
+            </div>
+            <div class="sect">
+              <h2>Logbook</h2>
+              <dl class="stats">
+                <dt>Lifetime ore</dt><dd id="st-all">0 t</dd>
+                <dt>This run</dt><dd id="st-run">0 t</dd>
+                <dt>Taps</dt><dd id="st-taps">0</dd>
+                <dt>Vessels</dt><dd id="st-fleet">0</dd>
+                <dt>Relocations</dt><dd id="st-runs">0</dd>
+                <dt>Comets caught</dt><dd id="st-comets">0</dd>
+                <dt>Missions done</dt><dd id="st-missions">0</dd>
+                <dt>Best supply streak</dt><dd id="st-best">0 days</dd>
+                <dt>Commendations</dt><dd id="st-ach">0</dd>
+              </dl>
+            </div>
+            <div class="sect">
+              <h2>Settings</h2>
+              <div class="row"><span>Sound</span><button class="btn" id="snd" type="button" aria-pressed="true">On</button></div>
+              <div id="notify-row" class="row" hidden><span>Reminders</span><button class="btn" id="notify" type="button" aria-pressed="false">Off</button></div>
+              <button class="btn danger" id="wipe" type="button">Wipe save</button>
+              <p class="note">Progress is saved on this device only.</p>
+              <p class="note"><span id="version"></span> <a id="privacy" href="#" target="_blank" rel="noopener" hidden>Privacy policy</a></p>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <nav class="nav" role="tablist" aria-label="Sections">
+        <button type="button" role="tab" aria-selected="true" data-tab="fleet">Fleet</button>
+        <button type="button" role="tab" aria-selected="false" data-tab="ups">Upgrades<span class="badge" id="b-ups" hidden></span></button>
+        <button type="button" role="tab" aria-selected="false" data-tab="goals">Goals<span class="badge" id="b-goals" hidden></span></button>
+        <button type="button" role="tab" aria-selected="false" data-tab="belt">Belt<span class="badge" id="b-belt" hidden></span></button>
+      </nav>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

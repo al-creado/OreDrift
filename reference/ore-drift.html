@@ -1,0 +1,909 @@
+<title>Ore Drift</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800&family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: one-screen mining console. Ore readout on top, tappable asteroid in the middle, tabbed ledger (Fleet, Upgrades, Belt) below.
+   Single dark look by design: it is a night-sky game, so no light palette. */
+:root{
+  --ink:#0b1020; --ink-2:#121b38; --panel:#141c33; --panel-2:#1b2542; --line:#28345a;
+  --text:#e8ebf5; --muted:#94a0c0;
+  --ore:#f2a24e; --ore-deep:#c97a2c; --ore-ink:#1c1206;
+  --rock:#464c68; --rock-hi:#727a9b; --warn:#e8806f;
+  --f-display:'Big Shoulders Display','Arial Narrow',Impact,sans-serif;
+  --f-body:'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  --f-mono:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+html{box-sizing:border-box;height:100%}
+*,*::before,*::after{box-sizing:inherit}
+body{
+  height:100%;margin:0;overflow:hidden;
+  background:radial-gradient(120% 55% at 50% 26%,var(--ink-2),var(--ink) 72%) no-repeat var(--ink);
+  color:var(--text);font:15px/1.4 var(--f-body);
+  touch-action:manipulation;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;
+}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;cursor:pointer}
+button:disabled{cursor:default}
+:focus-visible{outline:2px solid var(--ore);outline-offset:2px}
+
+.app{height:100%;max-width:560px;margin:0 auto;display:flex;flex-direction:column;min-height:0}
+.in{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+/* HUD */
+.hud .in{padding-top:12px;padding-bottom:2px}
+.label{font:600 .7rem/1 var(--f-body);letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.ore-row{display:flex;align-items:baseline;gap:8px;margin-top:6px}
+.ore{font:600 clamp(2.4rem,12vw,3.4rem)/1 var(--f-mono);letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.unit{font:700 1.3rem/1 var(--f-display);color:var(--ore)}
+.rates{display:flex;flex-wrap:wrap;align-items:center;gap:4px 12px;margin-top:8px;font:500 .82rem/1.2 var(--f-mono);color:var(--muted)}
+#rate{color:var(--ore)}
+.pill{padding:2px 8px;border:1px solid var(--line);border-radius:99px;color:var(--ore);font:500 .72rem/1.4 var(--f-mono)}
+
+/* Stage */
+.stage{position:relative;flex:0 0 auto;height:clamp(180px,33vh,330px);margin-top:4px}
+canvas{display:block;width:100%;height:100%;touch-action:none;outline-offset:-3px}
+.toast{
+  position:absolute;top:6px;left:max(16px,env(safe-area-inset-left,0px));right:max(16px,env(safe-area-inset-right,0px));
+  padding:9px 12px;border:1px solid var(--line);border-radius:8px;background:var(--panel-2);
+  font-size:.85rem;text-align:center;box-shadow:0 6px 20px rgba(0,0,0,.4);animation:pop .18s ease-out;
+}
+@keyframes pop{from{opacity:0;transform:translateY(-4px)}}
+
+/* Panes */
+.panes{flex:1;min-height:0;display:flex;flex-direction:column;border-top:1px solid var(--line);background:var(--ink)}
+.scroll{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+.bar{position:sticky;top:0;z-index:2;background:var(--ink)}
+.bar .in{display:flex;align-items:center;gap:12px;padding-top:10px;padding-bottom:4px}
+.list{display:grid;gap:8px;align-content:start;padding-top:8px;padding-bottom:16px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{min-height:40px;padding:0 15px;font:500 .8rem var(--f-mono);color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--ore);color:var(--ore-ink)}
+
+/* Cards */
+.card{display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:12px;align-items:center;padding:10px 12px;background:var(--panel);border:1px solid var(--line);border-radius:10px}
+.card.up{grid-template-columns:minmax(0,1fr) auto}
+.card.locked{opacity:.6;border-style:dashed}
+.count{display:grid;place-items:center;height:44px;border-radius:8px;background:var(--ink);border:1px solid var(--line);font:600 1rem var(--f-mono);color:var(--ore)}
+.info{min-width:0}
+.name{margin:0;font:700 1.15rem/1.1 var(--f-display);letter-spacing:.04em;text-transform:uppercase}
+.desc{margin:3px 0 0;font-size:.8rem;color:var(--muted)}
+.meta{margin:4px 0 0;font:500 .74rem/1.4 var(--f-mono);color:var(--muted);white-space:pre-line}
+.meta:empty{display:none}
+.buy{min-width:88px;min-height:48px;padding:6px 10px;display:grid;gap:1px;justify-items:center;align-content:center;text-align:center;border:1px solid var(--line);border-radius:8px;color:var(--muted)}
+.buy .bn{font:700 .75rem/1 var(--f-display);letter-spacing:.12em;text-transform:uppercase}
+.buy .bc{font:600 .92rem/1.2 var(--f-mono)}
+.buy.can{background:var(--ore);border-color:var(--ore);color:var(--ore-ink)}
+.buy.can:active{background:var(--ore-deep);border-color:var(--ore-deep)}
+.empty{padding:20px 6px;text-align:center;color:var(--muted);font-size:.9rem}
+.foot{text-align:center;color:var(--muted);font:500 .74rem var(--f-mono);padding:4px 0}
+
+/* Belt */
+.sect{display:grid;gap:12px;padding:14px;background:var(--panel);border:1px solid var(--line);border-radius:10px}
+.sect h2{margin:0;font:800 1.35rem/1 var(--f-display);letter-spacing:.05em;text-transform:uppercase}
+.note{margin:0;font-size:.85rem;color:var(--muted)}
+.row{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.pts{font:600 1.8rem/1 var(--f-mono);color:var(--ore)}
+.stats{display:grid;grid-template-columns:1fr auto;gap:6px 12px;margin:0;font-size:.85rem}
+.stats dt{color:var(--muted)}
+.stats dd{margin:0;text-align:right;font-family:var(--f-mono)}
+.btn{min-height:46px;padding:0 18px;border:1px solid var(--line);border-radius:8px;font:700 .95rem var(--f-display);letter-spacing:.1em;text-transform:uppercase}
+.btn.primary{background:var(--ore);border-color:var(--ore);color:var(--ore-ink)}
+.btn.primary:disabled{background:transparent;border-color:var(--line);color:var(--muted)}
+.btn.danger{color:var(--warn);border-color:var(--warn)}
+
+/* Goals */
+.pill.hot{background:var(--ore);border-color:var(--ore);color:var(--ore-ink);font-weight:600}
+.buy .bc:empty{display:none}
+.mtext{margin:0 0 8px;font:600 .95rem/1.25 var(--f-body)}
+.track{height:6px;border-radius:99px;background:var(--ink);border:1px solid var(--line);overflow:hidden}
+.fill{height:100%;width:0;background:var(--ore);transition:width .3s}
+.track + .meta{margin-top:6px}
+.mlist,.alist{display:grid;gap:8px}
+.sect .row h2{min-width:0}
+.dots{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+.dot{display:grid;place-items:center;height:38px;border:1px solid var(--line);border-radius:8px;background:var(--ink);font:600 .85rem var(--f-mono);color:var(--muted)}
+.dot.on{background:var(--ore);border-color:var(--ore);color:var(--ore-ink)}
+.dot.next{border-color:var(--ore);color:var(--ore);box-shadow:inset 0 0 0 1px var(--ore)}
+.dot.on.next{color:var(--ore-ink)}
+.card.ach{grid-template-columns:52px minmax(0,1fr)}
+.card.ach .count{font-size:.85rem;color:var(--muted)}
+.card.ach.done{border-color:var(--ore-deep)}
+.card.ach.done .count{background:var(--ore);border-color:var(--ore);color:var(--ore-ink);font-size:1.2rem}
+.card.ach .desc{margin-bottom:6px}
+.card.ach.done .desc{margin-bottom:0}
+
+/* Nav */
+.nav{display:grid;grid-template-columns:repeat(4,1fr);padding-left:max(0px,env(safe-area-inset-left,0px));padding-right:max(0px,env(safe-area-inset-right,0px));border-top:1px solid var(--line);background:var(--panel)}
+.nav button{position:relative;min-height:54px;padding:0 2px;font:700 .95rem var(--f-display);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.nav button[aria-selected="true"]{color:var(--ore);box-shadow:inset 0 2px 0 var(--ore)}
+.badge{position:absolute;top:9px;right:8px;width:7px;height:7px;border-radius:50%;background:var(--ore)}
+#reset{white-space:nowrap}
+
+@media (prefers-reduced-motion:reduce){.toast{animation:none}.fill{transition:none}}
+</style>
+
+<div class="app">
+  <header class="hud"><div class="in">
+    <div class="label">Ore in hold</div>
+    <div class="ore-row"><span class="ore" id="ore">0</span><span class="unit" title="tonnes">t</span></div>
+    <div class="rates"><span id="rate">+0 t/s</span><span id="tapv">tap +1</span><span class="pill" id="bonus" hidden title="Survey points and commendations"></span><span class="pill hot" id="frenzy" hidden></span></div>
+  </div></header>
+
+  <section class="stage">
+    <canvas id="cv" tabindex="0" role="img" aria-label="Asteroid. Tap it, or press space, to mine ore. Press C to catch a passing comet."></canvas>
+    <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+  </section>
+
+  <main class="panes">
+    <section class="scroll" id="tab-fleet" role="tabpanel" aria-label="Fleet">
+      <div class="bar"><div class="in">
+        <span class="label">Buy</span>
+        <div class="seg" id="seg">
+          <button type="button" data-m="1" aria-pressed="true">×1</button>
+          <button type="button" data-m="10" aria-pressed="false">×10</button>
+          <button type="button" data-m="max" aria-pressed="false">Max</button>
+        </div>
+      </div></div>
+      <div class="in list" id="fleet"></div>
+    </section>
+
+    <section class="scroll" id="tab-ups" role="tabpanel" aria-label="Upgrades" hidden>
+      <div class="in list" id="ups"></div>
+    </section>
+
+    <section class="scroll" id="tab-goals" role="tabpanel" aria-label="Goals" hidden>
+      <div class="in list">
+        <div class="sect">
+          <h2>Daily supply drop</h2>
+          <div class="dots" id="dots" role="img" aria-label="Seven day supply streak"></div>
+          <p class="note" id="supnote"></p>
+          <button class="btn primary" id="supply-btn" type="button">Claim</button>
+        </div>
+        <div class="sect">
+          <div class="row"><h2>Daily missions</h2><span class="label" id="reset"></span></div>
+          <div class="mlist" id="missions"></div>
+        </div>
+        <div class="sect">
+          <div class="row"><h2>Commendations</h2><span class="pts" id="achcount">0</span></div>
+          <p class="note" id="achnote"></p>
+          <div class="alist" id="achs"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="scroll" id="tab-belt" role="tabpanel" aria-label="Belt" hidden>
+      <div class="in list">
+        <div class="sect">
+          <h2>Relocate</h2>
+          <p class="note">Leave this belt for a richer one. You lose your ore, fleet and upgrades, and keep survey points. Each point adds 10% to every vessel and every tap.</p>
+          <div class="row"><span class="label">Survey points</span><span class="pts" id="pts">0</span></div>
+          <button class="btn primary" id="relocate" type="button" disabled>Relocate</button>
+          <p class="note" id="relnote"></p>
+        </div>
+        <div class="sect">
+          <h2>Logbook</h2>
+          <dl class="stats">
+            <dt>Lifetime ore</dt><dd id="st-all">0 t</dd>
+            <dt>This run</dt><dd id="st-run">0 t</dd>
+            <dt>Taps</dt><dd id="st-taps">0</dd>
+            <dt>Vessels</dt><dd id="st-fleet">0</dd>
+            <dt>Relocations</dt><dd id="st-runs">0</dd>
+            <dt>Comets caught</dt><dd id="st-comets">0</dd>
+            <dt>Missions done</dt><dd id="st-missions">0</dd>
+            <dt>Best supply streak</dt><dd id="st-best">0 days</dd>
+            <dt>Commendations</dt><dd id="st-ach">0</dd>
+          </dl>
+        </div>
+        <div class="sect">
+          <h2>Settings</h2>
+          <div class="row"><span>Sound</span><button class="btn" id="snd" type="button" aria-pressed="true">On</button></div>
+          <button class="btn danger" id="wipe" type="button">Wipe save</button>
+          <p class="note">Progress is saved in this browser only.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <nav class="nav" role="tablist" aria-label="Sections">
+    <button type="button" role="tab" aria-selected="true" data-tab="fleet">Fleet</button>
+    <button type="button" role="tab" aria-selected="false" data-tab="ups">Upgrades<span class="badge" id="b-ups" hidden></span></button>
+    <button type="button" role="tab" aria-selected="false" data-tab="goals">Goals<span class="badge" id="b-goals" hidden></span></button>
+    <button type="button" role="tab" aria-selected="false" data-tab="belt">Belt<span class="badge" id="b-belt" hidden></span></button>
+  </nav>
+</div>
+
+<script>
+(function(){
+'use strict';
+
+/*LOGIC-START*/
+const GROWTH=1.15, MILESTONES=[10,25,50,100,150,200], OFFLINE_CAP=8*3600, OFFLINE_RATE=0.5, PRESTIGE_BASE=1e6;
+const FRENZY_MULT=7, ACH_BONUS=0.01;
+
+function rng(seed){return()=>{seed|=0;seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+
+const GENS=[
+  {id:'drone',name:'Mining Drone',desc:'A small bot that chews rock all day.',base:15,rate:0.1},
+  {id:'laser',name:'Laser Rig',desc:'Cuts clean seams out of the surface.',base:100,rate:1},
+  {id:'tug',name:'Tug Crew',desc:'Hauls loose chunks back to the hold.',base:1100,rate:8},
+  {id:'barge',name:'Ore Barge',desc:'Moves tonnes of ore per trip.',base:12000,rate:47},
+  {id:'refinery',name:'Refinery Ship',desc:'Smelts on site and wastes nothing.',base:130000,rate:260},
+  {id:'foundry',name:'Orbital Foundry',desc:'Casts ingots in zero gravity.',base:1400000,rate:1400},
+  {id:'collector',name:'Stellar Collector',desc:'Harvests whole asteroids at once.',base:20000000,rate:7800}
+];
+const UPS=[
+  {id:'bits',name:'Carbide Bits',desc:'Every tap mines twice as much.',cost:100,tap:2},
+  {id:'tune1',name:'Fleet Tuning I',desc:'All vessels work 25% faster.',cost:2500,prod:1.25},
+  {id:'uplink',name:'Drone Uplink',desc:'Each tap also mines 5% of your ore per second.',cost:8000,link:0.05},
+  {id:'plasma',name:'Plasma Tips',desc:'Every tap mines twice as much.',cost:40000,tap:2},
+  {id:'tune2',name:'Fleet Tuning II',desc:'All vessels work 50% faster.',cost:600000,prod:1.5},
+  {id:'hammer',name:'Resonance Hammer',desc:'Every tap mines three times as much.',cost:8e6,tap:3},
+  {id:'uplink2',name:'Swarm Uplink',desc:'Each tap also mines another 10% of your ore per second.',cost:5e7,link:0.10},
+  {id:'tune3',name:'Fleet Tuning III',desc:'All vessels work twice as fast.',cost:3e8,prod:2},
+  {id:'pulse',name:'Gravity Pulse',desc:'Every tap mines five times as much.',cost:5e9,tap:5}
+];
+
+const SUF=['','K','M','B','T','Qa','Qi','Sx','Sp','Oc','No','Dc'];
+function fmt(n){
+  if(!isFinite(n)) return '∞';
+  if(n<0) n=0;
+  if(n<999.5){ if(n>=100) return String(Math.round(n)); return String(Math.round(n*10)/10); }
+  const e=Math.floor(Math.log10(n)/3);
+  if(e>=SUF.length) return n.toExponential(2).replace('e+','e');
+  const v=n/Math.pow(10,e*3);
+  const s=v.toFixed(v<10?2:v<100?1:0);
+  if(parseFloat(s)>=1000 && e+1<SUF.length) return (parseFloat(s)/1000).toFixed(2)+SUF[e+1];
+  return s+SUF[e];
+}
+const fmtOre=n=>n<1000?String(Math.floor(n)):fmt(n);
+function fmtDur(sec){
+  const h=Math.floor(sec/3600), m=Math.floor((sec%3600)/60);
+  return h>0?h+' h '+m+' m':Math.max(1,m)+' m';
+}
+
+function fresh(){return{ore:0,total:0,allTime:0,taps:0,points:0,runs:0,owned:{},ups:{},last:Date.now(),sound:true,
+  ach:{},stats:{comets:0,missions:0,best:0},streak:0,lastSupply:'',daily:null,frenzyUntil:0};}
+let S=fresh();
+
+const own=id=>S.owned[id]||0;
+function milestoneMult(n){let m=1;for(const k of MILESTONES) if(n>=k) m*=2;return m;}
+const surveyMult=()=>1+0.1*S.points;
+function prodMult(){let m=1;for(const u of UPS) if(S.ups[u.id]&&u.prod) m*=u.prod;return m*surveyMult()*achMult();}
+const frenzyOn=()=>Date.now()<S.frenzyUntil;
+const frenzyLeft=()=>Math.max(0,(S.frenzyUntil-Date.now())/1000);
+function startFrenzy(sec){const now=Date.now();S.frenzyUntil=Math.min(Math.max(now,S.frenzyUntil)+sec*1000,now+120000);}
+function ops(boost){let t=0;for(const g of GENS){const n=own(g.id);if(n) t+=n*g.rate*milestoneMult(n);}return t*prodMult()*((boost!==false&&frenzyOn())?FRENZY_MULT:1);}
+function tapValue(o){
+  let m=1,l=0;
+  for(const u of UPS){ if(!S.ups[u.id]) continue; if(u.tap) m*=u.tap; if(u.link) l+=u.link; }
+  return m*surveyMult()*achMult()*(frenzyOn()?FRENZY_MULT:1)+o*l;
+}
+const unitCost=g=>g.base*Math.pow(GROWTH,own(g.id));
+const bulkCost=(g,n)=>Math.ceil(unitCost(g)*(Math.pow(GROWTH,n)-1)/(GROWTH-1));
+function maxBuy(g){
+  const c=unitCost(g);
+  if(S.ore<c) return 0;
+  let n=Math.floor(Math.log(S.ore*(GROWTH-1)/c+1)/Math.log(GROWTH));
+  n=Math.max(0,Math.min(n,1000));
+  while(n>0&&bulkCost(g,n)>S.ore) n--;
+  return n;
+}
+const prestigeGain=()=>Math.floor(Math.sqrt(S.total/PRESTIGE_BASE));
+const visibleUps=()=>UPS.filter(u=>!S.ups[u.id]&&S.total>=u.cost*0.3);
+
+/* ---- commendations (achievements) ---- */
+const fleetCount=()=>GENS.reduce((a,g)=>a+own(g.id),0);
+const kindCount=()=>GENS.filter(g=>own(g.id)>0).length;
+const upCount=()=>UPS.filter(u=>S.ups[u.id]).length;
+const ACHS=[
+  {id:'t1',name:'First Strikes',desc:'Tap the asteroid 100 times.',t:100,v:()=>S.taps},
+  {id:'t2',name:'Steady Hands',desc:'Tap 1,000 times.',t:1e3,v:()=>S.taps},
+  {id:'t3',name:'Jackhammer',desc:'Tap 10,000 times.',t:1e4,v:()=>S.taps},
+  {id:'t4',name:'Rock Breaker',desc:'Tap 100,000 times.',t:1e5,v:()=>S.taps},
+  {id:'o1',name:'First Haul',desc:'Mine 1,000 t in total.',t:1e3,v:()=>S.allTime},
+  {id:'o2',name:'Cargo Run',desc:'Mine 1 million t in total.',t:1e6,v:()=>S.allTime},
+  {id:'o3',name:'Heavy Freight',desc:'Mine 1 billion t in total.',t:1e9,v:()=>S.allTime},
+  {id:'o4',name:'Belt Baron',desc:'Mine 1 trillion t in total.',t:1e12,v:()=>S.allTime},
+  {id:'f1',name:'Small Crew',desc:'Own 10 vessels at once.',t:10,v:fleetCount},
+  {id:'f2',name:'Proper Fleet',desc:'Own 50 vessels at once.',t:50,v:fleetCount},
+  {id:'f3',name:'Armada',desc:'Own 150 vessels at once.',t:150,v:fleetCount},
+  {id:'f4',name:'Swarm',desc:'Own 400 vessels at once.',t:400,v:fleetCount},
+  {id:'k1',name:'Mixed Fleet',desc:'Own 3 kinds of vessel.',t:3,v:kindCount},
+  {id:'k2',name:'Full Roster',desc:'Own 5 kinds of vessel.',t:5,v:kindCount},
+  {id:'k3',name:'One of Each',desc:'Own all 7 kinds of vessel.',t:GENS.length,v:kindCount},
+  {id:'u1',name:'Tooled Up',desc:'Install 3 upgrades in one run.',t:3,v:upCount},
+  {id:'u2',name:'Fully Fitted',desc:'Install every upgrade in one run.',t:UPS.length,v:upCount},
+  {id:'r1',name:'New Horizons',desc:'Relocate to a new belt.',t:1,v:()=>S.runs},
+  {id:'r2',name:'Belt Hopper',desc:'Relocate 5 times.',t:5,v:()=>S.runs},
+  {id:'r3',name:'Survey Veteran',desc:'Relocate 10 times.',t:10,v:()=>S.runs},
+  {id:'c1',name:'Sky Watcher',desc:'Catch a comet.',t:1,v:()=>S.stats.comets},
+  {id:'c2',name:'Comet Hunter',desc:'Catch 25 comets.',t:25,v:()=>S.stats.comets},
+  {id:'c3',name:'Vein Chaser',desc:'Catch 100 comets.',t:100,v:()=>S.stats.comets},
+  {id:'m1',name:'Clocking In',desc:'Complete 3 daily missions.',t:3,v:()=>S.stats.missions},
+  {id:'m2',name:'Regular',desc:'Complete 30 daily missions.',t:30,v:()=>S.stats.missions},
+  {id:'m3',name:'Lifer',desc:'Complete 100 daily missions.',t:100,v:()=>S.stats.missions},
+  {id:'s1',name:'Back Again',desc:'Reach a 3-day supply streak.',t:3,v:()=>S.stats.best},
+  {id:'s2',name:'Week Out',desc:'Reach a 7-day supply streak.',t:7,v:()=>S.stats.best},
+  {id:'s3',name:'Long Haul',desc:'Reach a 30-day supply streak.',t:30,v:()=>S.stats.best},
+  {id:'p1',name:'Humming',desc:'Reach 100 t/s.',t:100,v:()=>ops(false)},
+  {id:'p2',name:'Roaring',desc:'Reach 10,000 t/s.',t:1e4,v:()=>ops(false)},
+  {id:'p3',name:'Unstoppable',desc:'Reach 1 million t/s.',t:1e6,v:()=>ops(false)}
+];
+const achCount=()=>ACHS.reduce((a,x)=>a+(S.ach[x.id]?1:0),0);
+const achMult=()=>1+ACH_BONUS*achCount();
+function checkAch(){
+  const out=[];
+  for(const a of ACHS){ if(!S.ach[a.id]&&a.v()>=a.t){ S.ach[a.id]=true; out.push(a); } }
+  return out;
+}
+
+/* ---- daily missions and supply drop ---- */
+const MTYPES=['tap','mine','buy','comet'];
+function dayKey(d){d=d||new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+function prevDayKey(){const d=new Date();d.setDate(d.getDate()-1);return dayKey(d);}
+function hashStr(s){let h=2166136261;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);}return h>>>0;}
+function nice(n){ if(n<10) return Math.ceil(n); const e=Math.pow(10,Math.floor(Math.log10(n))-1); return Math.round(n/e)*e; }
+function makeMissions(day){
+  const r=rng(hashStr(day)), types=MTYPES.slice();
+  for(let i=types.length-1;i>0;i--){const j=Math.floor(r()*(i+1));const x=types[i];types[i]=types[j];types[j]=x;}
+  return types.slice(0,3).map(type=>{
+    let target;
+    if(type==='tap') target=[150,250,400][Math.floor(r()*3)];
+    else if(type==='mine') target=nice(Math.max(3000,S.allTime*0.04));
+    else if(type==='buy') target=8+Math.floor(r()*13);
+    else target=2+Math.floor(r()*3);
+    return{type,target,progress:0,claimed:false};
+  });
+}
+function ensureDaily(){
+  const d=dayKey();
+  if(!S.daily||S.daily.day!==d){ S.daily={day:d,missions:makeMissions(d),chest:false}; return true; }
+  return false;
+}
+function addProg(type,n){
+  if(!S.daily) return;
+  for(const m of S.daily.missions) if(m.type===type&&!m.claimed&&m.progress<m.target) m.progress=Math.min(m.target,m.progress+n);
+}
+function missionText(m){
+  if(m.type==='tap') return 'Tap the asteroid '+fmt(m.target)+' times';
+  if(m.type==='mine') return 'Mine '+fmt(m.target)+' t of ore';
+  if(m.type==='buy') return 'Hire '+m.target+' vessels';
+  return 'Catch '+m.target+' comets';
+}
+const minutesOfOre=(min,floor)=>Math.max(floor,ops(false)*60*min);
+const missionReward=()=>minutesOfOre(8,400);
+const chestReward=()=>minutesOfOre(25,2500);
+const canSupply=()=>S.lastSupply!==dayKey();
+const nextStreak=()=>S.lastSupply===prevDayKey()?S.streak+1:1;
+const shownStreak=()=>(S.lastSupply===dayKey()||S.lastSupply===prevDayKey())?S.streak:0;
+const supplyFactor=n=>1+0.25*(Math.min(n,7)-1);
+const supplyReward=()=>{const f=supplyFactor(nextStreak());return minutesOfOre(15*f,600*f);};
+function goalsReady(){
+  if(canSupply()) return true;
+  const D=S.daily; if(!D) return false;
+  if(D.missions.some(m=>!m.claimed&&m.progress>=m.target)) return true;
+  return !D.chest&&D.missions.every(m=>m.claimed);
+}
+/*LOGIC-END*/
+
+const $=id=>document.getElementById(id);
+const setText=(el,s)=>{if(el.textContent!==s) el.textContent=s;};
+const REDUCED=matchMedia('(prefers-reduced-motion: reduce)').matches;
+const SAVE_KEY='oredrift.v1';
+let buyMode=1, activeTab='fleet', lastT=Date.now();
+
+/* ---------- saving ---------- */
+function serialize(){S.last=Date.now();return JSON.stringify(S);}
+function save(){try{localStorage.setItem(SAVE_KEY,serialize());}catch(e){}}
+function load(raw){
+  try{
+    const d=JSON.parse(raw), f=fresh(), num=(v,def)=>Number.isFinite(v)&&v>=0?v:def;
+    S=Object.assign(f,{
+      ore:num(d.ore,0),total:num(d.total,0),allTime:num(d.allTime,0),taps:Math.floor(num(d.taps,0)),
+      points:Math.floor(num(d.points,0)),runs:Math.floor(num(d.runs,0)),last:num(d.last,Date.now()),sound:d.sound!==false
+    });
+    for(const g of GENS){const n=Math.floor(num(d.owned&&d.owned[g.id],0)); if(n>0) S.owned[g.id]=n;}
+    for(const u of UPS){ if(d.ups&&d.ups[u.id]===true) S.ups[u.id]=true; }
+    for(const a of ACHS){ if(d.ach&&d.ach[a.id]===true) S.ach[a.id]=true; }
+    const st=d.stats||{};
+    S.stats={comets:Math.floor(num(st.comets,0)),missions:Math.floor(num(st.missions,0)),best:Math.floor(num(st.best,0))};
+    S.streak=Math.floor(num(d.streak,0));
+    S.lastSupply=typeof d.lastSupply==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(d.lastSupply)?d.lastSupply:'';
+    S.frenzyUntil=num(d.frenzyUntil,0);
+    const D=d.daily;
+    if(D&&typeof D.day==='string'&&Array.isArray(D.missions)&&D.missions.length===3&&
+       D.missions.every(m=>m&&MTYPES.indexOf(m.type)>=0&&Number.isFinite(m.target)&&m.target>0)){
+      S.daily={day:D.day,chest:D.chest===true,missions:D.missions.map(m=>({
+        type:m.type,target:m.target,progress:Math.min(m.target,num(m.progress,0)),claimed:m.claimed===true}))};
+    }
+    return true;
+  }catch(e){return false;}
+}
+
+/* ---------- toast, sound ---------- */
+let toastTimer=0, toastBusy=false; const toastQ=[];
+function toast(msg,ms){
+  if(toastQ.length>=4) toastQ.shift();
+  toastQ.push([msg,ms||3200]);
+  if(!toastBusy) nextToast();
+}
+function nextToast(){
+  const t=$('toast'), n=toastQ.shift();
+  clearTimeout(toastTimer);
+  if(!n){ toastBusy=false; t.hidden=true; return; }
+  toastBusy=true; t.textContent=n[0]; t.hidden=false;
+  t.style.animation='none'; void t.offsetWidth; t.style.animation='';
+  toastTimer=setTimeout(nextToast,toastQ.length?Math.min(n[1],3500):n[1]);
+}
+let actx=null;
+function audio(){
+  if(!S.sound) return null;
+  try{ actx=actx||new (window.AudioContext||window.webkitAudioContext)(); if(actx.state==='suspended') actx.resume(); return actx; }
+  catch(e){ return null; }
+}
+function blip(f,d,v,type){
+  const a=audio(); if(!a) return;
+  try{
+    const o=a.createOscillator(), g=a.createGain(), t=a.currentTime;
+    o.type=type||'triangle'; o.frequency.setValueAtTime(f,t);
+    g.gain.setValueAtTime(v,t); g.gain.exponentialRampToValueAtTime(0.0001,t+d);
+    o.connect(g); g.connect(a.destination); o.start(t); o.stop(t+d);
+  }catch(e){}
+}
+const buzz=ms=>{try{navigator.vibrate&&navigator.vibrate(ms);}catch(e){}};
+
+/* ---------- game actions ---------- */
+function gain(x,reward){S.ore+=x;S.total+=x;S.allTime+=x;if(!reward) addProg('mine',x);}
+function offline(sec){
+  const s=Math.min(sec,OFFLINE_CAP), g=ops(false)*s*OFFLINE_RATE;
+  if(g>0){
+    gain(g);
+    toast('Away '+fmtDur(sec)+'. Your fleet mined +'+fmt(g)+' t at half rate'+(sec>OFFLINE_CAP?' (capped at 8 h).':'.'),9000);
+  }
+}
+function tick(now){
+  const dt=(now-lastT)/1000; lastT=now;
+  if(dt<=0) return;
+  if(dt>60) offline(dt); else gain(ops()*dt);
+}
+function doTap(x,y){
+  const v=tapValue(ops());
+  gain(v); S.taps++; addProg('tap',1);
+  spawnTap(x,y,v);
+  blip(170+Math.random()*70,0.07,0.05,'square'); buzz(5);
+}
+function buy(g){
+  const n=buyMode==='max'?Math.max(1,maxBuy(g)):buyMode, cost=bulkCost(g,n);
+  if(S.ore<cost) return;
+  S.ore-=cost; addProg('buy',n);
+  const before=own(g.id), after=before+n; S.owned[g.id]=after;
+  for(const k of MILESTONES) if(before<k&&after>=k) toast(g.name+' output doubled at '+k+' owned.');
+  blip(440,0.09,0.05); setTimeout(()=>blip(660,0.12,0.05),70);
+  updateUI();
+}
+function buyUp(u){
+  if(S.ups[u.id]||S.ore<u.cost) return;
+  S.ore-=u.cost; S.ups[u.id]=true;
+  toast('Installed '+u.name+'.');
+  blip(520,0.1,0.05); setTimeout(()=>blip(780,0.16,0.05),80);
+  updateUI();
+}
+function relocate(){
+  const g=prestigeGain(); if(g<1) return;
+  S.points+=g; S.runs++; S.ore=0; S.total=0; S.owned={}; S.ups={};
+  toast('New belt surveyed. +'+g+' survey point'+(g>1?'s':'')+'.',4500);
+  blip(330,0.2,0.06); setTimeout(()=>blip(494,0.2,0.06),120); setTimeout(()=>blip(740,0.3,0.06),240);
+  save(); updateUI();
+}
+function wipe(){
+  S=fresh(); lastT=Date.now(); upKey=''; achKey=-1; comet=null; nextComet=Date.now()+25000;
+  ensureDaily(); save(); updateUI(); toast('Save wiped. Fresh belt.');
+}
+
+/* ---------- goals: claims and comets ---------- */
+function claimMission(i){
+  const m=S.daily&&S.daily.missions[i]; if(!m||m.claimed||m.progress<m.target) return;
+  const g=missionReward(); m.claimed=true; S.stats.missions++; gain(g,true);
+  toast('Mission complete. +'+fmt(g)+' t.'); blip(520,0.1,0.05); setTimeout(()=>blip(780,0.14,0.05),80); updateUI();
+}
+function claimChest(){
+  const D=S.daily; if(!D||D.chest||!D.missions.every(m=>m.claimed)) return;
+  const g=chestReward(); D.chest=true; gain(g,true); startFrenzy(60);
+  toast('Daily cache opened. +'+fmt(g)+' t and output ×'+FRENZY_MULT+' for 60 s.',4500);
+  blip(392,0.15,0.05); setTimeout(()=>blip(587,0.15,0.05),90); setTimeout(()=>blip(880,0.25,0.05),180); updateUI();
+}
+function claimSupply(){
+  if(!canSupply()) return;
+  const g=supplyReward(), n=nextStreak();
+  S.streak=n; S.lastSupply=dayKey(); S.stats.best=Math.max(S.stats.best,n); gain(g,true);
+  toast('Supply drop collected. +'+fmt(g)+' t. Streak: '+n+(n===1?' day.':' days.'),4000);
+  blip(440,0.12,0.05); setTimeout(()=>blip(660,0.18,0.05),90); save(); updateUI();
+}
+let comet=null, nextComet=Date.now()+25000;
+function cometPos(c){
+  const p=c.t/c.life, x=c.dir>0?-30+(W+60)*p:W+30-(W+60)*p;
+  return [x,H*(0.3+0.08*Math.sin(c.t*1.4+c.ph))];
+}
+function updateComet(dt){
+  if(!comet){
+    if(W&&Date.now()>=nextComet) comet={t:0,life:8,dir:Math.random()<0.5?1:-1,ph:Math.random()*6.283};
+    return;
+  }
+  comet.t+=dt;
+  if(comet.t>=comet.life){ comet=null; nextComet=Date.now()+(40+Math.random()*50)*1000; }
+}
+function catchComet(){
+  if(!comet) return;
+  const q=cometPos(comet); comet=null; nextComet=Date.now()+(50+Math.random()*60)*1000;
+  S.stats.comets++; addProg('comet',1);
+  for(let i=0;i<(REDUCED?4:14);i++){
+    const a=Math.random()*6.283,sp=60+Math.random()*140;
+    fx.chips.push({x:q[0],y:q[1],vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,life:0,max:0.6+Math.random()*0.5,s:2+Math.random()*3,r:Math.random()*6,vr:(Math.random()-0.5)*10,c:Math.random()<0.7?ORE:ORE_HI});
+  }
+  if(Math.random()<0.7){ startFrenzy(30); toast('Rich vein! Output ×'+FRENZY_MULT+' for 30 s.',3500); }
+  else{ const g=minutesOfOre(13,300); gain(g,true); toast('Cargo pod! +'+fmt(g)+' t.',3500); }
+  blip(700,0.1,0.06); setTimeout(()=>blip(1050,0.2,0.06),70); buzz(20); updateUI();
+}
+
+/* ---------- UI ---------- */
+const cards={};
+function buildFleet(){
+  const host=$('fleet'); host.textContent='';
+  GENS.forEach(g=>{
+    const el=document.createElement('article'); el.className='card';
+    el.innerHTML='<div class="count"></div><div class="info"><h3 class="name"></h3><p class="desc"></p><p class="meta"></p></div><button class="buy" type="button"><span class="bn"></span><span class="bc"></span></button>';
+    const c={root:el,count:el.querySelector('.count'),name:el.querySelector('.name'),desc:el.querySelector('.desc'),
+             meta:el.querySelector('.meta'),btn:el.querySelector('.buy'),bn:el.querySelector('.bn'),bc:el.querySelector('.bc')};
+    c.btn.addEventListener('click',()=>buy(g));
+    host.appendChild(el); cards[g.id]=c;
+  });
+}
+function updateFleet(){
+  let lockShown=false; const pm=prodMult();
+  GENS.forEach((g,i)=>{
+    const c=cards[g.id], n=own(g.id), revealed=i===0||n>0||S.total>=g.base*0.4;
+    if(revealed){
+      c.root.hidden=false; c.root.classList.remove('locked'); c.btn.hidden=false;
+      const each=g.rate*milestoneMult(n||1)*pm, next=MILESTONES.find(k=>k>n);
+      setText(c.count,String(n)); setText(c.name,g.name); setText(c.desc,g.desc);
+      setText(c.meta,n>0
+        ? fmt(each)+' t/s each, '+fmt(n*each)+' t/s total\n'+(next?'Output doubles at '+next+' owned':'All output boosts earned')
+        : fmt(g.rate*pm)+' t/s each\nOutput doubles at '+MILESTONES[0]+' owned');
+      const q=buyMode==='max'?Math.max(1,maxBuy(g)):buyMode, cost=bulkCost(g,q), can=S.ore>=cost;
+      setText(c.bn,'Buy ×'+q); setText(c.bc,fmt(cost));
+      c.btn.disabled=!can; c.btn.classList.toggle('can',can);
+    }else if(!lockShown){
+      lockShown=true;
+      c.root.hidden=false; c.root.classList.add('locked'); c.btn.hidden=true;
+      setText(c.count,'?'); setText(c.name,'Unknown vessel'); setText(c.desc,'Mine '+fmt(g.base*0.4)+' t this run to reveal it.'); setText(c.meta,'');
+    }else c.root.hidden=true;
+  });
+}
+
+let upKey='', upEls={};
+function updateUps(){
+  const vis=visibleUps(), installed=UPS.filter(u=>S.ups[u.id]).length, key=vis.map(u=>u.id).join(',')+'|'+installed;
+  const host=$('ups');
+  if(key!==upKey){
+    upKey=key; upEls={}; host.textContent='';
+    if(!vis.length){
+      const e=document.createElement('div'); e.className='empty';
+      e.textContent=installed===UPS.length?'Everything is installed. Relocate on the Belt tab to start a stronger run.':'Nothing to install yet. Keep mining and new gear shows up here.';
+      host.appendChild(e);
+    }
+    vis.forEach(u=>{
+      const el=document.createElement('article'); el.className='card up';
+      const info=document.createElement('div'); info.className='info';
+      const h=document.createElement('h3'); h.className='name'; h.textContent=u.name;
+      const p=document.createElement('p'); p.className='desc'; p.textContent=u.desc;
+      info.append(h,p);
+      const b=document.createElement('button'); b.type='button'; b.className='buy';
+      b.innerHTML='<span class="bn">Install</span><span class="bc"></span>';
+      b.querySelector('.bc').textContent=fmt(u.cost);
+      b.addEventListener('click',()=>buyUp(u));
+      el.append(info,b); host.appendChild(el); upEls[u.id]=b;
+    });
+    const f=document.createElement('div'); f.className='foot'; f.textContent=installed+' of '+UPS.length+' installed';
+    host.appendChild(f);
+  }
+  vis.forEach(u=>{const b=upEls[u.id]; if(!b) return; const can=S.ore>=u.cost; b.disabled=!can; b.classList.toggle('can',can);});
+}
+
+function updateBelt(){
+  if(activeTab!=='belt') return;
+  const g=prestigeGain();
+  setText($('pts'),String(S.points));
+  $('relocate').disabled=g<1;
+  setText($('relnote'),g>=1
+    ? 'Relocating now earns +'+g+' survey point'+(g>1?'s':'')+' (+'+g*10+'%). The next point comes at '+fmt(Math.pow(g+1,2)*PRESTIGE_BASE)+' t this run.'
+    : 'Mine '+fmt(PRESTIGE_BASE-S.total)+' more t this run to earn your first survey point.');
+  setText($('st-all'),fmt(S.allTime)+' t'); setText($('st-run'),fmt(S.total)+' t');
+  setText($('st-taps'),S.taps.toLocaleString('en-US'));
+  setText($('st-fleet'),String(GENS.reduce((a,g)=>a+own(g.id),0)));
+  setText($('st-runs'),String(S.runs));
+  setText($('st-comets'),String(S.stats.comets)); setText($('st-missions'),String(S.stats.missions));
+  setText($('st-best'),S.stats.best+(S.stats.best===1?' day':' days')); setText($('st-ach'),achCount()+' of '+ACHS.length);
+  setText($('snd'),S.sound?'On':'Off'); $('snd').setAttribute('aria-pressed',String(S.sound));
+}
+
+/* goals tab */
+const G={dots:[],m:[]}, achEls=[]; let achKey=-1;
+function buildGoals(){
+  const dots=$('dots'); dots.textContent=''; G.dots=[];
+  for(let i=1;i<=7;i++){const d=document.createElement('span');d.className='dot';d.textContent=String(i);dots.appendChild(d);G.dots.push(d);}
+  const host=$('missions'); host.textContent=''; G.m=[];
+  for(let i=0;i<4;i++){
+    const el=document.createElement('article'); el.className='card up';
+    el.innerHTML='<div class="info"><p class="mtext"></p><div class="track"><div class="fill"></div></div><p class="meta"></p></div><button class="buy" type="button"><span class="bn"></span><span class="bc"></span></button>';
+    const c={text:el.querySelector('.mtext'),fill:el.querySelector('.fill'),meta:el.querySelector('.meta'),btn:el.querySelector('.buy'),bn:el.querySelector('.bn'),bc:el.querySelector('.bc')};
+    c.btn.addEventListener('click',()=>{ if(i<3) claimMission(i); else claimChest(); });
+    host.appendChild(el); G.m.push(c);
+  }
+  $('supply-btn').addEventListener('click',claimSupply);
+}
+function setBtn(c,can,bn,bc){
+  setText(c.bn,bn); setText(c.bc,bc||''); c.btn.disabled=!can; c.btn.classList.toggle('can',can);
+}
+function setFill(el,p){const w=Math.max(0,Math.min(100,p))+'%'; if(el.style.width!==w) el.style.width=w;}
+function buildAch(){
+  const host=$('achs'); host.textContent=''; achEls.length=0;
+  const ratio=a=>Math.min(1,a.v()/a.t);
+  const list=ACHS.slice().sort((a,b)=>{
+    const ua=S.ach[a.id]?1:0, ub=S.ach[b.id]?1:0;
+    if(ua!==ub) return ua-ub;
+    return ua?0:ratio(b)-ratio(a);
+  });
+  list.forEach(a=>{
+    const el=document.createElement('article'); el.className='card ach';
+    el.innerHTML='<div class="count"></div><div class="info"><h3 class="name"></h3><p class="desc"></p><div class="track"><div class="fill"></div></div><p class="meta"></p></div>';
+    el.querySelector('.name').textContent=a.name; el.querySelector('.desc').textContent=a.desc;
+    host.appendChild(el);
+    achEls.push({a,root:el,mark:el.querySelector('.count'),track:el.querySelector('.track'),fill:el.querySelector('.fill'),meta:el.querySelector('.meta')});
+  });
+  achKey=achCount();
+}
+function updateGoals(){
+  const D=S.daily; if(!D) return;
+  const sh=shownStreak(), can=canSupply(), nx=Math.min(nextStreak(),7), f=supplyFactor(nextStreak());
+  G.dots.forEach((d,i)=>{d.classList.toggle('on',i<Math.min(sh,7)); d.classList.toggle('next',can&&i===nx-1);});
+  $('dots').setAttribute('aria-label','Supply streak: '+sh+' of 7 days');
+  setText($('supnote'),can
+    ? 'Day '+nx+' pays ×'+f+', about '+fmt(supplyReward())+' t. Miss a day and the streak starts over.'
+    : 'Collected for today. Streak: '+S.streak+(S.streak===1?' day. ':' days. ')+(S.streak>=7?'Bonus is at its maximum.':'Come back tomorrow for a bigger drop.'));
+  const sb=$('supply-btn'); sb.disabled=!can; setText(sb,can?'Claim '+fmt(supplyReward()):'Collected');
+
+  const now=new Date(), mid=new Date(now.getFullYear(),now.getMonth(),now.getDate()+1);
+  const left=Math.max(0,Math.floor((mid-now)/60000));
+  setText($('reset'),Math.floor(left/60)+'h '+(left%60)+'m left');
+  const rew=missionReward();
+  D.missions.forEach((m,i)=>{
+    const c=G.m[i], done=m.progress>=m.target;
+    setText(c.text,missionText(m)); setFill(c.fill,100*m.progress/m.target);
+    setText(c.meta,m.claimed?'Claimed':fmt(m.progress)+' / '+fmt(m.target)+'\nReward about '+fmt(rew)+' t');
+    if(m.claimed) setBtn(c,false,'Claimed','');
+    else if(done) setBtn(c,true,'Claim','+'+fmt(rew));
+    else setBtn(c,false,Math.floor(100*m.progress/m.target)+'%','');
+  });
+  const cc=G.m[3], got=D.missions.filter(m=>m.claimed).length, all=got===3, cr=chestReward();
+  setText(cc.text,'Daily cache'); setFill(cc.fill,100*got/3);
+  setText(cc.meta,D.chest?'Opened today':got+' of 3 missions claimed\nPays about '+fmt(cr)+' t and ×'+FRENZY_MULT+' output for 60 s');
+  if(D.chest) setBtn(cc,false,'Opened','');
+  else if(all) setBtn(cc,true,'Open','+'+fmt(cr));
+  else setBtn(cc,false,'Locked','');
+
+  if(achKey!==achCount()) buildAch();
+  const n=achCount();
+  setText($('achcount'),n+' / '+ACHS.length);
+  setText($('achnote'),'Each commendation adds +'+Math.round(ACH_BONUS*100)+'% to all output and taps, and stays through relocations. Current bonus: +'+Math.round(n*ACH_BONUS*100)+'%.');
+  achEls.forEach(e=>{
+    const done=!!S.ach[e.a.id], v=Math.min(e.a.v(),e.a.t);
+    e.root.classList.toggle('done',done); e.track.hidden=done;
+    setText(e.mark,done?'✓':Math.floor(100*v/e.a.t)+'%');
+    setText(e.meta,done?'':fmt(v)+' / '+fmt(e.a.t));
+    if(!done) setFill(e.fill,100*v/e.a.t);
+  });
+}
+function housekeeping(){
+  const had=!!S.daily;
+  if(ensureDaily()&&had) toast('New daily missions are ready.');
+  for(const a of checkAch()){
+    toast('Commendation earned: '+a.name+'. All output +'+Math.round(ACH_BONUS*100)+'%.',4200);
+    blip(600,0.12,0.05); setTimeout(()=>blip(900,0.2,0.05),100);
+  }
+}
+function updateUI(){
+  housekeeping();
+  const o=ops();
+  setText($('rate'),'+'+fmt(o)+' t/s'); setText($('tapv'),'tap +'+fmt(tapValue(o)));
+  const b=$('bonus'), bp=Math.round((surveyMult()*achMult()-1)*100);
+  if(bp>0){b.hidden=false;setText(b,'+'+bp+'% bonus');}else b.hidden=true;
+  const fz=$('frenzy');
+  if(frenzyOn()){fz.hidden=false;setText(fz,'×'+FRENZY_MULT+' for '+Math.ceil(frenzyLeft())+'s');}else fz.hidden=true;
+  updateFleet(); updateUps(); if(activeTab==='goals') updateGoals(); updateBelt();
+  $('b-ups').hidden=!visibleUps().some(u=>S.ore>=u.cost);
+  $('b-goals').hidden=!goalsReady();
+  $('b-belt').hidden=prestigeGain()<1;
+}
+function selectTab(name){
+  activeTab=name;
+  document.querySelectorAll('.nav button').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.tab===name)));
+  ['fleet','ups','goals','belt'].forEach(t=>{$('tab-'+t).hidden=t!==name;});
+  updateUI();
+}
+function confirmable(btn,label,armedLabel,action){
+  let armed=false,timer=0;
+  btn.addEventListener('click',()=>{
+    if(!armed){armed=true;btn.textContent=armedLabel;timer=setTimeout(()=>{armed=false;btn.textContent=label;},4000);return;}
+    clearTimeout(timer);armed=false;btn.textContent=label;action();
+  });
+}
+
+/* ---------- canvas ---------- */
+const cv=$('cv'), ctx=cv.getContext('2d');
+const cs=getComputedStyle(document.documentElement), css=(n,f)=>cs.getPropertyValue(n).trim()||f;
+const ORE=css('--ore','#f2a24e'), ORE_HI='#ffd9a8', ROCK=css('--rock','#464c68'), ROCK_HI=css('--rock-hi','#727a9b'), STAR=css('--text','#e8ebf5');
+const MONO="'IBM Plex Mono',ui-monospace,Menlo,monospace";
+let W=0,H=0,DPR=1;
+function resize(){
+  const r=cv.getBoundingClientRect(); if(!r.width||!r.height) return;
+  DPR=Math.min(window.devicePixelRatio||1,2.5); W=r.width; H=r.height;
+  cv.width=Math.round(W*DPR); cv.height=Math.round(H*DPR); ctx.setTransform(DPR,0,0,DPR,0,0);
+}
+const N=16, R1=rng(11), R2=rng(23), R3=rng(5);
+const pts=[]; for(let i=0;i<N;i++){const r=0.8+0.2*R1()-(i%5===0?0.05:0),a=i/N*Math.PI*2;pts.push([Math.cos(a)*r,Math.sin(a)*r]);}
+const mid=(a,b)=>[(a[0]+b[0])/2,(a[1]+b[1])/2];
+function rockPath(c){
+  c.beginPath(); const s=mid(pts[N-1],pts[0]); c.moveTo(s[0],s[1]);
+  for(let i=0;i<N;i++){const p=pts[i],e=mid(p,pts[(i+1)%N]);c.quadraticCurveTo(p[0],p[1],e[0],e[1]);}
+  c.closePath();
+}
+const craters=[]; for(let i=0;i<5;i++){const a=R2()*6.283,d=0.12+0.5*R2();craters.push({x:Math.cos(a)*d,y:Math.sin(a)*d,r:0.08+0.1*R2()});}
+const veins=[]; for(let v=0;v<6;v++){
+  let a=R3()*6.283,d=0.15+0.5*R3(),x=Math.cos(a)*d,y=Math.sin(a)*d,dir=R3()*6.283; const line=[[x,y]];
+  for(let k=0;k<4;k++){dir+=(R3()-0.5)*1.4;x+=Math.cos(dir)*0.13;y+=Math.sin(dir)*0.13;const l=Math.hypot(x,y);if(l>0.7){x*=0.7/l;y*=0.7/l;}line.push([x,y]);}
+  veins.push(line);
+}
+const stars=[]; for(let i=0;i<70;i++) stars.push({x:Math.random(),y:Math.random(),s:0.5+Math.random()*1.1,sp:0.002+Math.random()*0.012,tw:1+Math.random()*3,ph:Math.random()*6.283});
+
+const fx={chips:[],texts:[]};
+let rot=0,pulse=0,glow=0.12,tClock=0,prevDraw=Date.now();
+const hitComet=(x,y)=>{ if(!comet) return false; const q=cometPos(comet); return Math.hypot(x-q[0],y-q[1])<=44; };
+function spawnTap(x,y,v){
+  pulse=1; glow=1;
+  const n=REDUCED?2:6;
+  for(let i=0;i<n;i++){
+    const a=Math.random()*6.283,sp=40+Math.random()*90;
+    fx.chips.push({x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-20,life:0,max:0.5+Math.random()*0.4,s:2+Math.random()*3,r:Math.random()*6,vr:(Math.random()-0.5)*10,c:Math.random()<0.6?ORE:ROCK_HI});
+  }
+  if(fx.chips.length>80) fx.chips.splice(0,fx.chips.length-80);
+  fx.texts.push({x:x+(Math.random()-0.5)*24,y:y-8,t:'+'+fmt(v),life:0,max:0.9});
+  if(fx.texts.length>24) fx.texts.shift();
+}
+function draw(dt){
+  ctx.clearRect(0,0,W,H);
+  for(const s of stars){
+    s.x-=s.sp*dt; if(s.x<0) s.x+=1;
+    ctx.globalAlpha=Math.max(0.1,0.35+0.45*Math.sin(tClock*s.tw+s.ph));
+    ctx.fillStyle=STAR; ctx.beginPath(); ctx.arc(s.x*W,s.y*H,s.s,0,6.283); ctx.fill();
+  }
+  ctx.globalAlpha=1;
+  const cx=W/2, cy=H/2+2, base=Math.min(W*0.42,H*0.36);
+  const gb=frenzyOn()?0.65:0.12;
+  pulse*=Math.exp(-dt*9); glow=gb+(glow-gb)*Math.exp(-dt*3.2); if(!REDUCED) rot+=dt*0.12;
+
+  ctx.save(); ctx.translate(cx,cy); ctx.rotate(rot); ctx.scale(base*(1+pulse*0.07),base*(1+pulse*0.07));
+  rockPath(ctx); ctx.fillStyle=ROCK; ctx.fill();
+  for(const c of craters){
+    ctx.beginPath(); ctx.ellipse(c.x,c.y,c.r,c.r*0.85,0,0,6.283); ctx.fillStyle='rgba(6,9,22,.32)'; ctx.fill();
+    ctx.beginPath(); ctx.ellipse(c.x,c.y,c.r,c.r*0.85,0,0.15*Math.PI,0.85*Math.PI); ctx.lineWidth=0.014; ctx.strokeStyle='rgba(255,255,255,.12)'; ctx.stroke();
+  }
+  ctx.save(); rockPath(ctx); ctx.clip(); ctx.rotate(-rot);
+  const lg=ctx.createRadialGradient(-0.38,-0.42,0.05,0,0,1.15);
+  lg.addColorStop(0,'rgba(255,255,255,.22)'); lg.addColorStop(0.55,'rgba(255,255,255,0)'); lg.addColorStop(1,'rgba(4,6,16,.55)');
+  ctx.fillStyle=lg; ctx.fillRect(-1.3,-1.3,2.6,2.6); ctx.restore();
+  ctx.lineCap='round'; ctx.lineJoin='round';
+  ctx.shadowColor=ORE; ctx.shadowBlur=(4+16*glow)*DPR; ctx.strokeStyle=ORE; ctx.lineWidth=0.04; ctx.globalAlpha=0.5+0.5*glow;
+  for(const v of veins){ctx.beginPath();v.forEach((p,i)=>i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]));ctx.stroke();}
+  ctx.shadowBlur=0; ctx.shadowColor='transparent'; ctx.strokeStyle=ORE_HI; ctx.lineWidth=0.014; ctx.globalAlpha=0.35+0.6*glow;
+  for(const v of veins){ctx.beginPath();v.forEach((p,i)=>i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]));ctx.stroke();}
+  ctx.globalAlpha=1;
+  rockPath(ctx); ctx.lineWidth=0.012; ctx.strokeStyle='rgba(255,255,255,.1)'; ctx.stroke();
+  ctx.restore();
+
+  const nShips=Math.min(14,GENS.reduce((a,g)=>a+own(g.id),0)), k0=Math.max(0.8,Math.min(1.4,base/110));
+  for(let i=0;i<nShips;i++){
+    const dir=i%2?1:-1, sp=(0.22+0.04*(i%5))*dir, ang=tClock*sp+i*2.399, rx=base*(1.28+(i%4)*0.13), ry=rx*0.5;
+    const x=cx+Math.cos(ang)*rx, y=cy+Math.sin(ang)*ry;
+    const h=Math.atan2(Math.cos(ang)*ry*sp,-Math.sin(ang)*rx*sp), bp=(tClock*0.45+i*0.37)%1;
+    if(bp<0.14){
+      const dx=x-cx, dy=y-cy, l=Math.hypot(dx,dy)||1;
+      ctx.globalAlpha=1-bp/0.14; ctx.strokeStyle=ORE; ctx.lineWidth=1.3;
+      ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(cx+dx/l*base*0.9,cy+dy/l*base*0.9); ctx.stroke(); ctx.globalAlpha=1;
+    }
+    ctx.save(); ctx.translate(x,y); ctx.rotate(h); ctx.scale(k0,k0); ctx.fillStyle=STAR;
+    ctx.beginPath(); ctx.moveTo(5,0); ctx.lineTo(-4,3.2); ctx.lineTo(-4,-3.2); ctx.closePath(); ctx.fill(); ctx.restore();
+  }
+
+  if(comet){
+    for(let k=14;k>=1;k--){
+      const tt=comet.t-k*0.1; if(tt<0) continue;
+      const q=cometPos({t:tt,life:comet.life,dir:comet.dir,ph:comet.ph});
+      ctx.globalAlpha=(1-k/15)*0.5; ctx.fillStyle=ORE; ctx.beginPath(); ctx.arc(q[0],q[1],7*(1-k/16),0,6.283); ctx.fill();
+    }
+    const q=cometPos(comet), ringR=24+(REDUCED?0:4*Math.sin(tClock*6));
+    const cg=ctx.createRadialGradient(q[0],q[1],1,q[0],q[1],20);
+    cg.addColorStop(0,'#fff6e6'); cg.addColorStop(0.35,ORE_HI); cg.addColorStop(1,'rgba(242,162,78,0)');
+    ctx.globalAlpha=1; ctx.fillStyle=cg; ctx.beginPath(); ctx.arc(q[0],q[1],20,0,6.283); ctx.fill();
+    ctx.strokeStyle=ORE; ctx.lineWidth=1.5; ctx.globalAlpha=0.7; ctx.beginPath(); ctx.arc(q[0],q[1],ringR,0,6.283); ctx.stroke();
+    ctx.globalAlpha=1;
+  }
+  for(let i=fx.chips.length-1;i>=0;i--){
+    const p=fx.chips[i]; p.life+=dt;
+    if(p.life>=p.max){fx.chips.splice(i,1);continue;}
+    const drag=Math.pow(0.04,dt); p.x+=p.vx*dt; p.y+=p.vy*dt; p.vx*=drag; p.vy*=drag; p.r+=p.vr*dt;
+    ctx.save(); ctx.globalAlpha=1-p.life/p.max; ctx.translate(p.x,p.y); ctx.rotate(p.r); ctx.fillStyle=p.c; ctx.fillRect(-p.s/2,-p.s/2,p.s,p.s); ctx.restore();
+  }
+  ctx.font='600 16px '+MONO; ctx.textAlign='center'; ctx.lineWidth=3; ctx.lineJoin='round';
+  for(let i=fx.texts.length-1;i>=0;i--){
+    const p=fx.texts[i]; p.life+=dt;
+    if(p.life>=p.max){fx.texts.splice(i,1);continue;}
+    const q=p.life/p.max, y=p.y-p.life*46;
+    ctx.globalAlpha=1-q*q; ctx.strokeStyle='rgba(8,12,26,.85)'; ctx.strokeText(p.t,p.x,y); ctx.fillStyle=ORE_HI; ctx.fillText(p.t,p.x,y);
+  }
+  ctx.globalAlpha=1;
+}
+
+/* ---------- loop and boot ---------- */
+let lastOre='';
+function frame(){
+  const now=Date.now(); tick(now);
+  const dt=Math.min(0.05,(now-prevDraw)/1000); prevDraw=now; tClock+=dt;
+  const s=fmtOre(S.ore); if(s!==lastOre){lastOre=s;$('ore').textContent=s;}
+  updateComet(dt);
+  if(W) draw(dt);
+  requestAnimationFrame(frame);
+}
+function start(data){
+  let raw=null;
+  if(data&&typeof data.save==='string') raw=data.save;
+  else{try{raw=localStorage.getItem(SAVE_KEY);}catch(e){}}
+  if(raw) load(raw);
+
+  buildFleet(); buildGoals();
+  document.querySelectorAll('#seg button').forEach(b=>b.addEventListener('click',()=>{
+    buyMode=b.dataset.m==='max'?'max':+b.dataset.m;
+    document.querySelectorAll('#seg button').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));
+    updateUI();
+  }));
+  document.querySelectorAll('.nav button').forEach(b=>b.addEventListener('click',()=>selectTab(b.dataset.tab)));
+  confirmable($('relocate'),'Relocate','Tap again to relocate',relocate);
+  confirmable($('wipe'),'Wipe save','Tap again to wipe',wipe);
+  $('snd').addEventListener('click',()=>{S.sound=!S.sound;updateUI();});
+  $('toast').addEventListener('click',nextToast);
+  cv.addEventListener('pointerdown',e=>{
+    e.preventDefault();
+    const r=cv.getBoundingClientRect(), x=e.clientX-r.left, y=e.clientY-r.top;
+    if(hitComet(x,y)) catchComet(); else doTap(x,y);
+  });
+  cv.addEventListener('keydown',e=>{
+    if(e.key===' '||e.key==='Enter'){e.preventDefault();doTap(W/2+(Math.random()-0.5)*40,H/2);}
+    else if(e.key==='c'||e.key==='C'){catchComet();}
+  });
+  new ResizeObserver(resize).observe(cv); resize();
+  document.addEventListener('visibilitychange',()=>{if(document.hidden) save();});
+  addEventListener('pagehide',save);
+
+  lastT=Date.now(); prevDraw=lastT;
+  const away=(lastT-S.last)/1000; if(away>60) offline(away);
+  ensureDaily();
+  if(canSupply()) toast('Your daily supply drop is ready on the Goals tab.',4500);
+  updateUI();
+  setInterval(updateUI,250); setInterval(save,5000);
+  requestAnimationFrame(frame);
+}
+
+try{ window.claude&&window.claude.hot&&window.claude.hot.snapshot&&window.claude.hot.snapshot(()=>({save:serialize()})); }catch(e){}
+const hot=window.claude&&window.claude.hot;
+if(hot&&typeof hot.ready==='function') hot.ready(start); else start(hot&&hot.data?hot.data:{});
+})();
+</script>

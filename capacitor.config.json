@@ -1,0 +1,17 @@
+{
+  "appId": "com.al.oredrift",
+  "appName": "Ore Drift",
+  "webDir": "dist",
+  "backgroundColor": "#0b1020",
+  "android": {
+    "backgroundColor": "#0b1020"
+  },
+  "plugins": {
+    "SplashScreen": {
+      "backgroundColor": "#0b1020",
+      "launchShowDuration": 600,
+      "launchAutoHide": true,
+      "showSpinner": false
+    }
+  }
+}
