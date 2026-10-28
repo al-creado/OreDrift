@@ -99,7 +99,7 @@ function housekeeping(now) {
   knownChapters = chapters.length;
 }
 
-const pctText = (x) => Number((x * 100).toFixed(1)) + '%';
+const pctText = (x) => L.fmtPct(x);
 
 /**
  * Announces new commendations in the commendation banner (not the regular toast) and sets their ore gifts aside

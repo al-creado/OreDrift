@@ -1091,6 +1091,14 @@ describe("the Captain's journal", () => {
 });
 
 describe('number formatting', () => {
+  it('percentages: plain below 1,000%, abbreviated above', () => {
+    expect(L.fmtPct(0.01)).toBe('1%');
+    expect(L.fmtPct(0.005)).toBe('0.5%');
+    expect(L.fmtPct(0.517)).toBe('51.7%');
+    expect(L.fmtPct(9.994, 0)).toBe('999%');
+    expect(L.fmtPct(153.92, 0)).toBe('15.4K%');
+    expect(L.fmtPct(1.5e5)).toBe('15.0M%');
+  });
   it('small numbers', () => {
     expect(L.fmt(0)).toBe('0');
     expect(L.fmt(0.04)).toBe('0');

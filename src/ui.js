@@ -197,7 +197,7 @@ export function createUI(h) {
     $('rl-detail').hidden = g < 1;
     setText($('rl-pts'), pv.pointsBefore + ' → ' + pv.pointsAfter);
     setText($('rl-sb'), '+' + pct(pv.surveyBefore) + ' → +' + pct(pv.surveyAfter));
-    setText($('rl-total'), '+' + Math.round(pv.bonusBefore * 100) + '% → +' + Math.round(pv.bonusAfter * 100) + '%');
+    setText($('rl-total'), '+' + L.fmtPct(pv.bonusBefore, 0) + ' → +' + L.fmtPct(pv.bonusAfter, 0));
     setText($('rl-belt'), beltFor(s.runs).name + ' → ' + beltFor(s.runs + 1).name);
     const lose = pv.lose;
     setText($('rl-lose'), L.fmt(lose.ore) + ' t of ore, ' + lose.vessels + ' vessel' + (lose.vessels === 1 ? '' : 's') + ', ' + lose.upgrades + ' upgrade' + (lose.upgrades === 1 ? '' : 's') + ' and this run\'s ' + L.fmt(lose.run) + ' t of progress.');
@@ -253,7 +253,7 @@ export function createUI(h) {
   }
   /* ---------- commendations: one tile per chain (Bronze, Silver, Gold...) ---------- */
   const tierOf = (a) => Math.min(4, a.tier);
-  const pct = (x) => Number((x * 100).toFixed(1)) + '%';
+  const pct = (x) => L.fmtPct(x);
   const ratio = (s, a) => Math.min(1, L.achValue(s, a) / a.t);
   const chainOrder = (x, y) => ACH_GROUPS.indexOf(x.group) - ACH_GROUPS.indexOf(y.group) || L.CHAINS.indexOf(x) - L.CHAINS.indexOf(y);
 
@@ -446,8 +446,8 @@ export function createUI(h) {
     const s = S();
     const o = L.ops(s, now);
     setText($('rate'), '+' + L.fmt(o) + ' t/s'); setText($('tapv'), 'tap +' + L.fmt(L.tapValue(s, now, o)));
-    const b = $('bonus'), bp = Math.round((L.surveyMult(s) * L.achMult(s) * L.iapMult(s) - 1) * 100);
-    if (bp > 0) { b.hidden = false; setText(b, '+' + bp + '% bonus'); } else b.hidden = true;
+    const b = $('bonus'), bx = L.surveyMult(s) * L.achMult(s) * L.iapMult(s) - 1;
+    if (bx >= 0.005) { b.hidden = false; setText(b, '+' + L.fmtPct(bx, 0) + ' bonus'); } else b.hidden = true;
     const fz = $('frenzy');
     if (L.frenzyOn(s, now)) { fz.hidden = false; setText(fz, '×' + FRENZY_MULT + ' for ' + Math.ceil(L.frenzyLeft(s, now)) + 's'); } else fz.hidden = true;
     updateOre(s);

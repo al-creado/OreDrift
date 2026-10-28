@@ -44,6 +44,12 @@ export function fmt(n) {
 /** Big readout: whole tonnes below 1,000, otherwise fmt(). */
 export const fmtOre = (n) => (n < 1000 ? String(Math.floor(n)) : fmt(n));
 
+/** A fraction as a percent (0.5 -> "50%"), abbreviated like ore amounts once it passes 1,000% ("15.4K%"). */
+export function fmtPct(x, digits = 1) {
+  const p = x * 100;
+  return (p < 999.5 ? String(Number(Math.max(0, p).toFixed(digits))) : fmt(p)) + '%';
+}
+
 export function fmtDur(sec) {
   const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60);
   return h > 0 ? h + ' h ' + m + ' m' : Math.max(1, m) + ' m';
