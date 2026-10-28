@@ -215,7 +215,7 @@ export function createUI(h) {
   }
 
   /* ---------- goals ---------- */
-  const G = { dots: [], m: [] }, achEls = [];
+  const G = { dots: [], m: [], cache: [] }, achEls = [];
   let achKey = '', achView = 'type'; // view: next (closest to done), type (grouped), done (earned)
   const freshAch = new Set(); // earned this session; shown with a NEW pill until the Goals tab is left
   function buildGoals() {
@@ -225,14 +225,23 @@ export function createUI(h) {
       dots.appendChild(d); G.dots.push(d);
     }
     const host = $('missions'); host.textContent = ''; G.m = [];
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < 3; i++) {
       const el = document.createElement('article'); el.className = 'card up';
       el.innerHTML = '<div class="info"><p class="mtext"></p><div class="track"><div class="fill"></div></div><p class="meta"></p></div><button class="buy" type="button"><span class="bn"></span><span class="bc"></span></button>';
-      const c = { text: el.querySelector('.mtext'), fill: el.querySelector('.fill'), meta: el.querySelector('.meta'), btn: el.querySelector('.buy'), bn: el.querySelector('.bn'), bc: el.querySelector('.bc') };
-      c.btn.addEventListener('click', () => { if (i < 3) h.onClaimMission(i); else h.onClaimChest(); });
+      const c = { el, text: el.querySelector('.mtext'), fill: el.querySelector('.fill'), meta: el.querySelector('.meta'), btn: el.querySelector('.buy'), bn: el.querySelector('.bn'), bc: el.querySelector('.bc') };
+      c.btn.addEventListener('click', () => {
+        h.onClaimMission(i);
+        if (el.hidden) $('cache-btn').focus(); // the claimed card is gone; keep keyboard focus on the page
+      });
       host.appendChild(el); G.m.push(c);
     }
+    const cd = $('cache-dots'); cd.textContent = ''; G.cache = [];
+    for (let i = 0; i < 3; i++) {
+      const d = document.createElement('span'); d.className = 'dot'; d.textContent = String(i + 1);
+      cd.appendChild(d); G.cache.push(d);
+    }
     $('supply-btn').addEventListener('click', () => h.onClaimSupply());
+    $('cache-btn').addEventListener('click', () => h.onClaimChest());
   }
   function setBtn(c, can, bn, bc) {
     setText(c.bn, bn); setText(c.bc, bc || ''); c.btn.disabled = !can; c.btn.classList.toggle('can', can);
@@ -343,18 +352,22 @@ export function createUI(h) {
     const rew = L.missionReward(s);
     D.missions.forEach((m, i) => {
       const c = G.m[i], done = m.progress >= m.target;
+      c.el.hidden = m.claimed; // claimed missions leave the list
       setText(c.text, L.missionText(m)); setFill(c.fill, 100 * m.progress / m.target);
-      setText(c.meta, m.claimed ? 'Claimed' : L.fmt(m.progress) + ' / ' + L.fmt(m.target) + '\nReward about ' + L.fmt(rew) + ' t');
-      if (m.claimed) setBtn(c, false, 'Claimed', '');
-      else if (done) setBtn(c, true, 'Claim', '+' + L.fmt(rew));
+      setText(c.meta, L.fmt(m.progress) + ' / ' + L.fmt(m.target) + '\nReward about ' + L.fmt(rew) + ' t');
+      if (done) setBtn(c, true, 'Claim', '+' + L.fmt(rew));
       else setBtn(c, false, Math.floor(100 * m.progress / m.target) + '%', '');
     });
-    const cc = G.m[3], got = D.missions.filter((m) => m.claimed).length, all = got === 3, cr = L.chestReward(s);
-    setText(cc.text, 'Daily cache'); setFill(cc.fill, 100 * got / 3);
-    setText(cc.meta, D.chest ? 'Opened today' : got + ' of 3 missions claimed\nPays about ' + L.fmt(cr) + ' t and ×' + FRENZY_MULT + ' output for 60 s');
-    if (D.chest) setBtn(cc, false, 'Opened', '');
-    else if (all) setBtn(cc, true, 'Open', '+' + L.fmt(cr));
-    else setBtn(cc, false, 'Locked', '');
+    const got = D.missions.filter((m) => m.claimed).length, all = got === 3, cr = L.chestReward(s);
+    const md = $('mdone'); md.hidden = !all;
+    if (all) setText(md, 'All done for today. New missions arrive at midnight.');
+    G.cache.forEach((d, i) => d.classList.toggle('on', i < got));
+    $('cache-dots').setAttribute('aria-label', got + ' of 3 missions claimed');
+    setText($('cache-note'), D.chest
+      ? 'Opened for today. A new cache arrives at midnight.'
+      : (all ? 'Ready to open.' : 'Claim all three missions to unlock it.') + ' Pays about ' + L.fmt(cr) + ' t and ×' + FRENZY_MULT + ' output for 60\u00a0s.');
+    const cb = $('cache-btn'); cb.disabled = D.chest || !all;
+    setText(cb, D.chest ? 'Opened' : all ? 'Open +' + L.fmt(cr) : 'Locked');
 
     updateAch(s);
   }

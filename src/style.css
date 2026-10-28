@@ -151,6 +151,7 @@ canvas { display: block; width: 100%; height: 100%; touch-action: none; outline-
 .track + .meta { margin-top: 6px; }
 .mlist, .alist { display: grid; gap: 8px; }
 .dots { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+.dots.three { grid-template-columns: repeat(3, 1fr); }
 .dot { display: grid; place-items: center; height: 38px; border: 1px solid var(--line); border-radius: 8px; background: var(--ink); font: 600 .85rem var(--f-mono); color: var(--muted); }
 .dot.on { background: var(--ore); border-color: var(--ore); color: var(--ore-ink); }
 .dot.next { border-color: var(--ore); color: var(--ore); box-shadow: inset 0 0 0 1px var(--ore); }
