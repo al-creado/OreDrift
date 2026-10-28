@@ -23,6 +23,9 @@ const MOCK = import.meta.env.DEV && typeof location !== 'undefined' && location.
 
 const AD_TIMEOUT_MS = 3 * 60 * 1000;
 
+/** Startup steps go to the console (Android Studio Logcat, filter "OreDrift ads") so a silent failure can be traced. */
+const log = (msg, data) => { try { console.warn('OreDrift ads: ' + msg + (data === undefined ? '' : ' ' + JSON.stringify(data, Object.getOwnPropertyNames(Object(data))))); } catch (e) { /* ignore */ } };
+
 let ready = false;
 let privacyOptions = false;
 let busy = false;
@@ -35,18 +38,22 @@ export const needsPrivacyOptions = () => privacyOptions;
 /** Asks for consent where the law requires it, then starts the SDK. Safe to call once at boot; never throws. */
 export async function initAds() {
   if (MOCK) { ready = true; return; }
-  if (!isNative() || !adId) return;
+  if (!isNative() || !adId) { log('skipped: native=' + isNative() + ' adId=' + !!adId); return; }
   try {
     let info = await AdMob.requestConsentInfo();
+    log('consent info', info);
     if (info.status === AdmobConsentStatus.REQUIRED && info.isConsentFormAvailable) {
       info = await AdMob.showConsentForm();
+      log('consent form', info);
     }
     privacyOptions = info.privacyOptionsRequirementStatus === 'REQUIRED';
-    if (!info.canRequestAds) return;
+    if (!info.canRequestAds) { log('stopped: consent does not allow ad requests'); return; }
     await AdMob.initialize({ initializeForTesting: ADS_TESTING });
     ready = true;
+    log('ready');
   } catch (e) {
     ready = false;
+    log('init failed', e);
   }
 }
 
@@ -84,6 +91,7 @@ export async function showRewarded() {
         // The native call resolves only when the reward is earned; closing early is reported by Dismissed.
         AdMob.showRewardVideoAd().then(() => { earned = true; }).catch(() => finish('unavailable'));
       } catch (e) {
+        log('rewarded failed', e);
         finish('unavailable');
       }
     });
@@ -129,6 +137,7 @@ export async function showBanner() {
     await AdMob.showBanner({ adId: bannerId, isTesting: ADS_TESTING, adSize: BannerAdSize.ADAPTIVE_BANNER, position: BannerAdPosition.BOTTOM_CENTER, margin: 0 });
     bannerOn = true;
   } catch (e) {
+    log('banner failed', e);
     bannerOn = false;
     setBannerHeight(0);
   }
