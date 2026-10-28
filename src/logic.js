@@ -57,6 +57,7 @@ export function fresh(now = 0) {
     stats: { comets: 0, missions: 0, best: 0, ships: 0, drops: 0, chests: 0, capped: 0, night: 0, bare: 0, bestRun: 0, overdrive: 0 },
     streak: 0, lastSupply: '', daily: null, frenzyUntil: 0, notify: false, podReadyAt: 0,
     iap: { removeAds: false, starter: false, boost: false }, granted: [], journalSeen: 0,
+    gifts: {}, // commendation id -> ore gift waiting to be claimed
   };
 }
 
@@ -303,10 +304,27 @@ export function achGiftAmount(S, a) {
   const [min, floor] = ACH_GIFT[Math.min(4, a.tier)];
   return minutesOfOre(S, min, floor);
 }
-export function claimAchGift(S, a) {
+/** Sets aside a new commendation's ore gift (sized now, at current output) for the player to claim. Mutates S. */
+export function queueAchGift(S, a) {
   const g = achGiftAmount(S, a);
-  gain(S, g, true);
+  S.gifts[a.id] = g;
   return g;
+}
+/** Ore gifts waiting to be claimed, optionally for one chain only: { count, ore }. */
+export function pendingGifts(S, chainId) {
+  let count = 0, ore = 0;
+  for (const a of ACHS) {
+    if (S.gifts[a.id] === undefined || (chainId && a.chain !== chainId)) continue;
+    count++; ore += S.gifts[a.id];
+  }
+  return { count, ore };
+}
+/** Pays the waiting gifts (all, or one chain's). Mutates S. Returns the ore paid. */
+export function claimAchGifts(S, chainId) {
+  const { ore } = pendingGifts(S, chainId);
+  for (const a of ACHS) if (S.gifts[a.id] !== undefined && (!chainId || a.chain === chainId)) delete S.gifts[a.id];
+  if (ore > 0) gain(S, ore, true);
+  return ore;
 }
 
 /** Title for a number of commendations earned. */
@@ -394,6 +412,7 @@ export function supplyReward(S, date) {
 
 export function goalsReady(S, date) {
   if (canSupply(S, date)) return true;
+  if (pendingGifts(S).count > 0) return true;
   const D = S.daily;
   if (!D) return false;
   if (D.missions.some((m) => !m.claimed && m.progress >= m.target)) return true;

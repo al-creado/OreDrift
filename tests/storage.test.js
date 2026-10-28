@@ -6,7 +6,7 @@ const NOW = 2_000_000_000_000;
 const goodSave = () => ({
   ore: 12.5, total: 500, allTime: 9000, taps: 40, points: 2, runs: 1,
   owned: { drone: 5, laser: 2 }, ups: { bits: true }, last: NOW - 60_000, sound: false, notify: true,
-  ach: { t1: true }, stats: { comets: 3, missions: 4, best: 5, ships: 2, drops: 6, chests: 1, capped: 1 }, streak: 3, lastSupply: '2026-03-10',
+  ach: { t1: true }, gifts: { t1: 250 }, stats: { comets: 3, missions: 4, best: 5, ships: 2, drops: 6, chests: 1, capped: 1 }, streak: 3, lastSupply: '2026-03-10',
   daily: { day: '2026-03-10', chest: true, missions: [
     { type: 'tap', target: 150, progress: 20, claimed: false },
     { type: 'buy', target: 10, progress: 10, claimed: true },
@@ -23,6 +23,7 @@ describe('parseSave', () => {
     expect(S.owned).toEqual({ drone: 5, laser: 2 });
     expect(S.ups).toEqual({ bits: true });
     expect(S.ach).toEqual({ t1: true });
+    expect(S.gifts).toEqual({ t1: 250 });
     expect(S.stats).toEqual({ comets: 3, missions: 4, best: 5, ships: 2, drops: 6, chests: 1, capped: 1, night: 0, bare: 0, bestRun: 0, overdrive: 0 });
     expect(S.daily.missions).toHaveLength(3);
     expect(S.daily.chest).toBe(true);
@@ -62,6 +63,13 @@ describe('parseSave', () => {
     expect(S.owned).toEqual({ drone: 1 });
     expect(S.ups).toEqual({ bits: true });
     expect(S.ach).toEqual({ t1: true });
+  });
+
+  it('keeps waiting gifts only for earned commendations, and an older save has none', () => {
+    const S = parse({ ...goodSave(), gifts: { t1: 300, t2: 500, zz: 9, h1: 'x' } });
+    expect(S.gifts).toEqual({ t1: 300 });
+    const { gifts, ...old } = goodSave();
+    expect(parse(old).gifts).toEqual({});
   });
 
   it('wrong container types are ignored, not fatal', () => {

@@ -50,6 +50,11 @@ export function parseSave(raw, now = Date.now()) {
   for (const u of UPS) if (ups[u.id] === true) S.ups[u.id] = true;
   const ach = isObj(d.ach) ? d.ach : {};
   for (const a of ACHS) if (ach[a.id] === true) S.ach[a.id] = true;
+  const gifts = isObj(d.gifts) ? d.gifts : {};
+  for (const a of ACHS) {
+    const g = num(gifts[a.id], -1);
+    if (S.ach[a.id] && g >= 0) S.gifts[a.id] = g; // only earned commendations can owe a gift
+  }
 
   const st = isObj(d.stats) ? d.stats : {};
   S.stats = {

@@ -241,6 +241,7 @@ export function createUI(h) {
       cd.appendChild(d); G.cache.push(d);
     }
     $('supply-btn').addEventListener('click', () => h.onClaimSupply());
+    $('ach-claim').addEventListener('click', () => h.onClaimAch(null));
     $('cache-btn').addEventListener('click', () => h.onClaimChest());
   }
   function setBtn(c, can, bn, bc) {
@@ -287,8 +288,13 @@ export function createUI(h) {
         return;
       }
       const el = document.createElement('article'); el.className = 'card ach';
-      el.innerHTML = '<div class="count"></div><div class="info"><h3 class="name"><span class="nm"></span><span class="tier"></span><span class="tier secret" hidden>Secret</span><span class="newpill" hidden>New</span></h3><p class="chainline"><span class="ctitle"></span><span class="pips"></span></p><p class="desc"></p><div class="track"><div class="fill"></div></div><p class="meta"></p><p class="earned"></p></div>';
+      el.innerHTML = '<div class="count"></div><div class="info"><h3 class="name"><span class="nm"></span><span class="tier"></span><span class="tier secret" hidden>Secret</span><span class="newpill" hidden>New</span></h3><p class="chainline"><span class="ctitle"></span><span class="pips"></span></p><p class="desc"></p><div class="track"><div class="fill"></div></div><p class="meta"></p><p class="earned"></p></div><button class="buy can" type="button" hidden><span class="bn">Claim</span><span class="bc"></span></button>';
       el.querySelector('.ctitle').textContent = chain.title;
+      const btn = el.querySelector('.buy');
+      btn.addEventListener('click', () => {
+        h.onClaimAch(chain.id);
+        if (btn.hidden) $('achseg').querySelector('[aria-pressed="true"]').focus(); // the button is gone; keep focus in the section
+      });
       const pips = [...chain.steps.map((step) => {
         const p = document.createElement('span'); p.className = 'pip t' + tierOf(step); p.title = step.name;
         el.querySelector('.pips').appendChild(p); return p;
@@ -300,6 +306,7 @@ export function createUI(h) {
         chain, root: el, pips, mark: el.querySelector('.count'), nm: el.querySelector('.nm'), chip: el.querySelector('.tier'),
         desc: el.querySelector('.desc'), track: el.querySelector('.track'), fill: el.querySelector('.fill'),
         meta: el.querySelector('.meta'), earned: el.querySelector('.earned'), pill: el.querySelector('.newpill'),
+        btn, bc: el.querySelector('.bc'),
       });
     });
     achKey = achView + '|' + L.achCount(s);
@@ -309,8 +316,11 @@ export function createUI(h) {
     const n = L.achCount(s), rank = L.rankFor(n), nextRank = RANKS.find((r) => r.min > n);
     if (achKey !== achView + '|' + n) buildAch(s);
     setText($('achcount'), n + ' / ' + ACHS.length);
+    const all = L.pendingGifts(s), ab = $('ach-claim');
+    ab.hidden = all.count < 2; // one waiting gift is claimed from its own card
+    if (all.count >= 2) setText(ab, 'Claim all ' + all.count + ' rewards +' + L.fmt(all.ore));
     setText($('achrank'), 'Rank: ' + rank.name + (nextRank ? '. Next: ' + nextRank.name + ' at ' + nextRank.min + ' (' + (nextRank.min - n) + ' to go).' : '. The highest rank.'));
-    setText($('achnote'), 'Each tier you reach gives a permanent output and tap bonus (+1% for the first 32, +0.5% for the rest) and a one-time ore gift. They stay through relocations. Current bonus: +' + pct(L.achBonusTotal(s)) + '.');
+    setText($('achnote'), 'Each tier you reach gives a permanent output and tap bonus (+1% for the first 32, +0.5% for the rest) and a one-time ore gift you claim here. They stay through relocations. Current bonus: +' + pct(L.achBonusTotal(s)) + '.');
     achEls.forEach((e) => {
       const st = L.chainState(s, e.chain), a = st.next || st.last;
       e.root.classList.toggle('done', st.complete);
@@ -321,6 +331,9 @@ export function createUI(h) {
       setText(e.desc, st.complete ? 'Every tier earned.' : a.desc);
       e.track.hidden = st.complete;
       e.pill.hidden = !e.chain.steps.some((x) => freshAch.has(x.id));
+      const gift = L.pendingGifts(s, e.chain.id);
+      e.btn.hidden = !gift.count; e.root.classList.toggle('claim', gift.count > 0);
+      if (gift.count) { setText(e.bc, '+' + L.fmt(gift.ore)); e.btn.setAttribute('aria-label', 'Claim ' + L.fmt(gift.ore) + ' t for ' + e.chain.title); }
       const earnedNames = e.chain.steps.filter((x) => s.ach[x.id]).map((x) => '✓ ' + x.name);
       setText(e.earned, st.earnedCount && !st.complete ? earnedNames.join('   ') : (st.complete ? earnedNames.join('   ') : ''));
       e.earned.hidden = !st.earnedCount;
