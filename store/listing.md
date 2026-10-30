@@ -22,7 +22,7 @@ Tap a glowing asteroid and start mining. Hire drones, laser rigs and orbital fou
 **What you do**
 - Tap the asteroid to mine ore. Every tap counts.
 - Hire seven kinds of automatic miners, from a small Mining Drone to a Stellar Collector. Each one doubles its output when you own 10, 25, 50, 100, 150 and 200 of it.
-- Install 38 upgrades that boost taps, your whole fleet, or a single kind of vessel. New ones keep appearing as you grow.
+- Install upgrades that boost taps, your whole fleet, or a single kind of vessel. New ones keep appearing as you grow.
 - Catch passing supply ships for a temporary x7 output boost, and comets for a random pile of ore.
 - Collect a daily supply drop. Come back on consecutive days for bigger rewards, up to two and a half times the base.
 - Finish three new daily missions, then open the daily cache.

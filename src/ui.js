@@ -219,7 +219,7 @@ export function createUI(h) {
         p.textContent = nx.vessel ? 'Own ' + nx.own + ' × ' + GENS.find((g) => g.id === nx.vessel).name + ' to reveal it.' : 'Mine ' + L.fmt(nx.ore) + ' t this run to reveal it.';
         info.append(hd, p); el.append(info); host.appendChild(el);
       }
-      const f = document.createElement('div'); f.className = 'foot'; f.textContent = installed + ' of ' + UPS.length + ' installed';
+      const f = document.createElement('div'); f.className = 'foot'; f.textContent = installed + ' installed';
       host.appendChild(f);
     }
     vis.forEach((u) => {
