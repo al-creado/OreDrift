@@ -929,10 +929,30 @@ describe('commendations', () => {
         { type: 'mine', target: 100000, progress: 0, claimed: false },
         { type: 'tap', target: 5, progress: 0, claimed: false },
         { type: 'buy', target: 5, progress: 0, claimed: false }] };
-      expect(L.claimAchGift(S, byTier(1))).toBe(250);
+      L.queueAchGift(S, byTier(1));
+      expect(L.claimAchGifts(S, null)).toBe(250);
       expect(S.ore).toBe(250);
       expect(S.allTime).toBe(250);
       expect(S.daily.missions[0].progress).toBe(0);
+    });
+    it('waits to be claimed, at the amount set when earned', () => {
+      const S = state({ owned: { laser: 10 } }), a = byTier(1), b = ACHS.find((x) => x.tier === 2 && x.chain !== a.chain);
+      L.queueAchGift(S, a); L.queueAchGift(S, b);
+      expect(S.ore).toBe(0);
+      expect(L.pendingGifts(S)).toEqual({ count: 2, ore: 3600 + 9600 });
+      S.owned.laser = 100; // output went up since; the gift does not change
+      expect(L.claimAchGifts(S, a.chain)).toBe(3600);
+      expect(L.pendingGifts(S)).toEqual({ count: 1, ore: 9600 });
+      expect(L.claimAchGifts(S, null)).toBe(9600);
+      expect(L.claimAchGifts(S, null)).toBe(0); // nothing left; claiming twice pays once
+      expect(S.ore).toBe(3600 + 9600);
+    });
+    it('a waiting gift lights up the Goals tab', () => {
+      const S = state(), d = new Date(2026, 0, 2);
+      L.ensureDaily(S, d); S.lastSupply = L.dayKey(d);
+      expect(L.goalsReady(S, d)).toBe(false);
+      L.queueAchGift(S, byTier(1));
+      expect(L.goalsReady(S, d)).toBe(true);
     });
     it('checkAch alone pays nothing (the game pays it when announcing)', () => {
       const S = state({ taps: 100 });
@@ -1071,6 +1091,14 @@ describe("the Captain's journal", () => {
 });
 
 describe('number formatting', () => {
+  it('percentages: plain below 1,000%, abbreviated above', () => {
+    expect(L.fmtPct(0.01)).toBe('1%');
+    expect(L.fmtPct(0.005)).toBe('0.5%');
+    expect(L.fmtPct(0.517)).toBe('51.7%');
+    expect(L.fmtPct(9.994, 0)).toBe('999%');
+    expect(L.fmtPct(153.92, 0)).toBe('15.4K%');
+    expect(L.fmtPct(1.5e5)).toBe('15.0M%');
+  });
   it('small numbers', () => {
     expect(L.fmt(0)).toBe('0');
     expect(L.fmt(0.04)).toBe('0');
@@ -1258,7 +1286,7 @@ describe('shop', () => {
 describe('save-shape defaults', () => {
   it('fresh state has the documented fields', () => {
     const S = L.fresh(42);
-    expect(Object.keys(S).sort()).toEqual(['ach', 'allTime', 'daily', 'frenzyUntil', 'last', 'lastSupply', 'owned',
+    expect(Object.keys(S).sort()).toEqual(['ach', 'allTime', 'daily', 'frenzyUntil', 'gifts', 'last', 'lastSupply', 'owned',
       'granted', 'iap', 'journalSeen', 'music', 'notify', 'podReadyAt', 'points', 'ore', 'runs', 'sound', 'stats', 'streak', 'taps', 'total', 'ups'].sort());
     expect(S.last).toBe(42);
     expect(S.sound).toBe(true);

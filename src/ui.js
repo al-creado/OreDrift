@@ -197,7 +197,7 @@ export function createUI(h) {
     $('rl-detail').hidden = g < 1;
     setText($('rl-pts'), pv.pointsBefore + ' → ' + pv.pointsAfter);
     setText($('rl-sb'), '+' + pct(pv.surveyBefore) + ' → +' + pct(pv.surveyAfter));
-    setText($('rl-total'), '+' + Math.round(pv.bonusBefore * 100) + '% → +' + Math.round(pv.bonusAfter * 100) + '%');
+    setText($('rl-total'), '+' + L.fmtPct(pv.bonusBefore, 0) + ' → +' + L.fmtPct(pv.bonusAfter, 0));
     setText($('rl-belt'), beltFor(s.runs).name + ' → ' + beltFor(s.runs + 1).name);
     const lose = pv.lose;
     setText($('rl-lose'), L.fmt(lose.ore) + ' t of ore, ' + lose.vessels + ' vessel' + (lose.vessels === 1 ? '' : 's') + ', ' + lose.upgrades + ' upgrade' + (lose.upgrades === 1 ? '' : 's') + ' and this run\'s ' + L.fmt(lose.run) + ' t of progress.');
@@ -215,7 +215,7 @@ export function createUI(h) {
   }
 
   /* ---------- goals ---------- */
-  const G = { dots: [], m: [] }, achEls = [];
+  const G = { dots: [], m: [], cache: [] }, achEls = [];
   let achKey = '', achView = 'type'; // view: next (closest to done), type (grouped), done (earned)
   const freshAch = new Set(); // earned this session; shown with a NEW pill until the Goals tab is left
   function buildGoals() {
@@ -225,14 +225,24 @@ export function createUI(h) {
       dots.appendChild(d); G.dots.push(d);
     }
     const host = $('missions'); host.textContent = ''; G.m = [];
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < 3; i++) {
       const el = document.createElement('article'); el.className = 'card up';
       el.innerHTML = '<div class="info"><p class="mtext"></p><div class="track"><div class="fill"></div></div><p class="meta"></p></div><button class="buy" type="button"><span class="bn"></span><span class="bc"></span></button>';
-      const c = { text: el.querySelector('.mtext'), fill: el.querySelector('.fill'), meta: el.querySelector('.meta'), btn: el.querySelector('.buy'), bn: el.querySelector('.bn'), bc: el.querySelector('.bc') };
-      c.btn.addEventListener('click', () => { if (i < 3) h.onClaimMission(i); else h.onClaimChest(); });
+      const c = { el, text: el.querySelector('.mtext'), fill: el.querySelector('.fill'), meta: el.querySelector('.meta'), btn: el.querySelector('.buy'), bn: el.querySelector('.bn'), bc: el.querySelector('.bc') };
+      c.btn.addEventListener('click', () => {
+        h.onClaimMission(i);
+        if (el.hidden) $('cache-btn').focus(); // the claimed card is gone; keep keyboard focus on the page
+      });
       host.appendChild(el); G.m.push(c);
     }
+    const cd = $('cache-dots'); cd.textContent = ''; G.cache = [];
+    for (let i = 0; i < 3; i++) {
+      const d = document.createElement('span'); d.className = 'dot'; d.textContent = String(i + 1);
+      cd.appendChild(d); G.cache.push(d);
+    }
     $('supply-btn').addEventListener('click', () => h.onClaimSupply());
+    $('ach-claim').addEventListener('click', () => h.onClaimAch(null));
+    $('cache-btn').addEventListener('click', () => h.onClaimChest());
   }
   function setBtn(c, can, bn, bc) {
     setText(c.bn, bn); setText(c.bc, bc || ''); c.btn.disabled = !can; c.btn.classList.toggle('can', can);
@@ -243,7 +253,7 @@ export function createUI(h) {
   }
   /* ---------- commendations: one tile per chain (Bronze, Silver, Gold...) ---------- */
   const tierOf = (a) => Math.min(4, a.tier);
-  const pct = (x) => Number((x * 100).toFixed(1)) + '%';
+  const pct = (x) => L.fmtPct(x);
   const ratio = (s, a) => Math.min(1, L.achValue(s, a) / a.t);
   const chainOrder = (x, y) => ACH_GROUPS.indexOf(x.group) - ACH_GROUPS.indexOf(y.group) || L.CHAINS.indexOf(x) - L.CHAINS.indexOf(y);
 
@@ -278,8 +288,13 @@ export function createUI(h) {
         return;
       }
       const el = document.createElement('article'); el.className = 'card ach';
-      el.innerHTML = '<div class="count"></div><div class="info"><h3 class="name"><span class="nm"></span><span class="tier"></span><span class="tier secret" hidden>Secret</span><span class="newpill" hidden>New</span></h3><p class="chainline"><span class="ctitle"></span><span class="pips"></span></p><p class="desc"></p><div class="track"><div class="fill"></div></div><p class="meta"></p><p class="earned"></p></div>';
+      el.innerHTML = '<div class="count"></div><div class="info"><h3 class="name"><span class="nm"></span><span class="tier"></span><span class="tier secret" hidden>Secret</span><span class="newpill" hidden>New</span></h3><p class="chainline"><span class="ctitle"></span><span class="pips"></span></p><p class="desc"></p><div class="track"><div class="fill"></div></div><p class="meta"></p><p class="earned"></p></div><button class="buy can" type="button" hidden><span class="bn">Claim</span><span class="bc"></span></button>';
       el.querySelector('.ctitle').textContent = chain.title;
+      const btn = el.querySelector('.buy');
+      btn.addEventListener('click', () => {
+        h.onClaimAch(chain.id);
+        if (btn.hidden) $('achseg').querySelector('[aria-pressed="true"]').focus(); // the button is gone; keep focus in the section
+      });
       const pips = [...chain.steps.map((step) => {
         const p = document.createElement('span'); p.className = 'pip t' + tierOf(step); p.title = step.name;
         el.querySelector('.pips').appendChild(p); return p;
@@ -291,6 +306,7 @@ export function createUI(h) {
         chain, root: el, pips, mark: el.querySelector('.count'), nm: el.querySelector('.nm'), chip: el.querySelector('.tier'),
         desc: el.querySelector('.desc'), track: el.querySelector('.track'), fill: el.querySelector('.fill'),
         meta: el.querySelector('.meta'), earned: el.querySelector('.earned'), pill: el.querySelector('.newpill'),
+        btn, bc: el.querySelector('.bc'),
       });
     });
     achKey = achView + '|' + L.achCount(s);
@@ -300,8 +316,11 @@ export function createUI(h) {
     const n = L.achCount(s), rank = L.rankFor(n), nextRank = RANKS.find((r) => r.min > n);
     if (achKey !== achView + '|' + n) buildAch(s);
     setText($('achcount'), n + ' / ' + ACHS.length);
+    const all = L.pendingGifts(s), ab = $('ach-claim');
+    ab.hidden = all.count < 2; // one waiting gift is claimed from its own card
+    if (all.count >= 2) setText(ab, 'Claim all ' + all.count + ' rewards +' + L.fmt(all.ore));
     setText($('achrank'), 'Rank: ' + rank.name + (nextRank ? '. Next: ' + nextRank.name + ' at ' + nextRank.min + ' (' + (nextRank.min - n) + ' to go).' : '. The highest rank.'));
-    setText($('achnote'), 'Each tier you reach gives a permanent output and tap bonus (+1% for the first 32, +0.5% for the rest) and a one-time ore gift. They stay through relocations. Current bonus: +' + pct(L.achBonusTotal(s)) + '.');
+    setText($('achnote'), 'Each tier you reach gives a permanent output and tap bonus (+1% for the first 32, +0.5% for the rest) and a one-time ore gift you claim here. They stay through relocations. Current bonus: +' + pct(L.achBonusTotal(s)) + '.');
     achEls.forEach((e) => {
       const st = L.chainState(s, e.chain), a = st.next || st.last;
       e.root.classList.toggle('done', st.complete);
@@ -312,6 +331,9 @@ export function createUI(h) {
       setText(e.desc, st.complete ? 'Every tier earned.' : a.desc);
       e.track.hidden = st.complete;
       e.pill.hidden = !e.chain.steps.some((x) => freshAch.has(x.id));
+      const gift = L.pendingGifts(s, e.chain.id);
+      e.btn.hidden = !gift.count; e.root.classList.toggle('claim', gift.count > 0);
+      if (gift.count) { setText(e.bc, '+' + L.fmt(gift.ore)); e.btn.setAttribute('aria-label', 'Claim ' + L.fmt(gift.ore) + ' t for ' + e.chain.title); }
       const earnedNames = e.chain.steps.filter((x) => s.ach[x.id]).map((x) => '✓ ' + x.name);
       setText(e.earned, st.earnedCount && !st.complete ? earnedNames.join('   ') : (st.complete ? earnedNames.join('   ') : ''));
       e.earned.hidden = !st.earnedCount;
@@ -343,18 +365,22 @@ export function createUI(h) {
     const rew = L.missionReward(s);
     D.missions.forEach((m, i) => {
       const c = G.m[i], done = m.progress >= m.target;
+      c.el.hidden = m.claimed; // claimed missions leave the list
       setText(c.text, L.missionText(m)); setFill(c.fill, 100 * m.progress / m.target);
-      setText(c.meta, m.claimed ? 'Claimed' : L.fmt(m.progress) + ' / ' + L.fmt(m.target) + '\nReward about ' + L.fmt(rew) + ' t');
-      if (m.claimed) setBtn(c, false, 'Claimed', '');
-      else if (done) setBtn(c, true, 'Claim', '+' + L.fmt(rew));
+      setText(c.meta, L.fmt(m.progress) + ' / ' + L.fmt(m.target) + '\nReward about ' + L.fmt(rew) + ' t');
+      if (done) setBtn(c, true, 'Claim', '+' + L.fmt(rew));
       else setBtn(c, false, Math.floor(100 * m.progress / m.target) + '%', '');
     });
-    const cc = G.m[3], got = D.missions.filter((m) => m.claimed).length, all = got === 3, cr = L.chestReward(s);
-    setText(cc.text, 'Daily cache'); setFill(cc.fill, 100 * got / 3);
-    setText(cc.meta, D.chest ? 'Opened today' : got + ' of 3 missions claimed\nPays about ' + L.fmt(cr) + ' t and ×' + FRENZY_MULT + ' output for 60 s');
-    if (D.chest) setBtn(cc, false, 'Opened', '');
-    else if (all) setBtn(cc, true, 'Open', '+' + L.fmt(cr));
-    else setBtn(cc, false, 'Locked', '');
+    const got = D.missions.filter((m) => m.claimed).length, all = got === 3, cr = L.chestReward(s);
+    const md = $('mdone'); md.hidden = !all;
+    if (all) setText(md, 'All done for today. New missions arrive at midnight.');
+    G.cache.forEach((d, i) => d.classList.toggle('on', i < got));
+    $('cache-dots').setAttribute('aria-label', got + ' of 3 missions claimed');
+    setText($('cache-note'), D.chest
+      ? 'Opened for today. A new cache arrives at midnight.'
+      : (all ? 'Ready to open.' : 'Claim all three missions to unlock it.') + ' Pays about ' + L.fmt(cr) + ' t and ×' + FRENZY_MULT + ' output for 60\u00a0s.');
+    const cb = $('cache-btn'); cb.disabled = D.chest || !all;
+    setText(cb, D.chest ? 'Opened' : all ? 'Open +' + L.fmt(cr) : 'Locked');
 
     updateAch(s);
   }
@@ -420,8 +446,8 @@ export function createUI(h) {
     const s = S();
     const o = L.ops(s, now);
     setText($('rate'), '+' + L.fmt(o) + ' t/s'); setText($('tapv'), 'tap +' + L.fmt(L.tapValue(s, now, o)));
-    const b = $('bonus'), bp = Math.round((L.surveyMult(s) * L.achMult(s) * L.iapMult(s) - 1) * 100);
-    if (bp > 0) { b.hidden = false; setText(b, '+' + bp + '% bonus'); } else b.hidden = true;
+    const b = $('bonus'), bx = L.surveyMult(s) * L.achMult(s) * L.iapMult(s) - 1;
+    if (bx >= 0.005) { b.hidden = false; setText(b, '+' + L.fmtPct(bx, 0) + ' bonus'); } else b.hidden = true;
     const fz = $('frenzy');
     if (L.frenzyOn(s, now)) { fz.hidden = false; setText(fz, '×' + FRENZY_MULT + ' for ' + Math.ceil(L.frenzyLeft(s, now)) + 's'); } else fz.hidden = true;
     updateOre(s);

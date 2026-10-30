@@ -99,30 +99,40 @@ function housekeeping(now) {
   knownChapters = chapters.length;
 }
 
-const pctText = (x) => Number((x * 100).toFixed(1)) + '%';
+const pctText = (x) => L.fmtPct(x);
 
 /**
- * Pays each new commendation's ore gift and announces it in the commendation banner (not the regular toast).
- * One or a few unlock as separate banners in turn; many at once (e.g. right after an update) become a single summary.
+ * Announces new commendations in the commendation banner (not the regular toast) and sets their ore gifts aside
+ * for the player to claim on the Goals tab. One or a few unlock as separate banners in turn; many at once
+ * (e.g. right after an update) become a single summary.
  */
 function announceAch(list) {
-  const gifts = list.map((a) => L.claimAchGift(S, a));
+  const gifts = list.map((a) => L.queueAchGift(S, a));
   ui.markNew(list.map((a) => a.id));
   if (list.length <= 3) {
     list.forEach((a, i) => ui.achPop({
       kicker: 'Commendation earned', name: a.name, tier: a.tier, sub: a.desc,
-      reward: '+' + pctText(L.achBonus(a)) + ' output and taps · +' + L.fmt(gifts[i]) + ' t',
+      reward: '+' + pctText(L.achBonus(a)) + ' output and taps · ' + L.fmt(gifts[i]) + ' t to claim on Goals',
     }));
   } else {
     const bonus = list.reduce((t, a) => t + L.achBonus(a), 0), ore = gifts.reduce((t, g) => t + g, 0);
     ui.achPop({
       kicker: 'Commendations earned', many: true, tier: Math.max(...list.map((a) => a.tier)),
       name: list.length + ' new', sub: list.slice(0, 3).map((a) => a.name).join(', ') + ' and ' + (list.length - 3) + ' more',
-      reward: '+' + pctText(bonus) + ' output and taps · +' + L.fmt(ore) + ' t',
+      reward: '+' + pctText(bonus) + ' output and taps · ' + L.fmt(ore) + ' t to claim on Goals',
     });
   }
   sounds.achievement();
   save();
+}
+
+/** Claims the waiting commendation gifts: one chain's, or all of them when chainId is null. */
+function onClaimAch(chainId) {
+  const g = L.claimAchGifts(S, chainId);
+  if (!g) return;
+  ui.toast('Commendation reward claimed. +' + L.fmt(g) + ' t.');
+  sounds.claim();
+  refresh(); save();
 }
 
 function refresh() {
@@ -354,7 +364,7 @@ async function boot() {
 
   ui = createUI({
     getState: () => S,
-    onBuy, onBuyUp, onClaimMission, onClaimChest, onClaimSupply, onRelocate, onWipe, onToggleSound, onToggleMusic,
+    onBuy, onBuyUp, onClaimMission, onClaimChest, onClaimSupply, onClaimAch, onRelocate, onWipe, onToggleSound, onToggleMusic,
     onOpenJournal: () => { S.journalSeen = L.journalCount(S); save(); refresh(); },
     onToggleNotify: native.isNative() ? onToggleNotify : null,
     onRefresh: refresh,

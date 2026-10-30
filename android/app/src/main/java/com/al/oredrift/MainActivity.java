@@ -2,8 +2,11 @@ package com.al.oredrift;
 
 import android.os.Build;
 import android.os.Bundle;
+import android.os.SystemClock;
+import android.view.MotionEvent;
 import android.view.WindowManager;
 import android.webkit.WebSettings;
+import android.webkit.WebView;
 
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
@@ -13,6 +16,9 @@ import com.getcapacitor.BridgeActivity;
 
 /** Fullscreen game: the status and navigation bars stay hidden (a swipe from the edge shows them briefly). */
 public class MainActivity extends BridgeActivity {
+    /** True between a touch's first finger down and its ACTION_UP or ACTION_CANCEL. */
+    private boolean touchOpen;
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -38,9 +44,40 @@ public class MainActivity extends BridgeActivity {
         settings.setDisplayZoomControls(false);
     }
 
+    /**
+     * Some phones take over three-finger touches (for example a three-finger screenshot gesture) without
+     * sending the game the matching ACTION_UP or ACTION_CANCEL. The WebView then thinks a finger is still
+     * down, treats every later one-finger drag as a pinch, and nothing scrolls until the app restarts.
+     * When a new touch starts before the last one ended, cancel the old one first.
+     */
+    @Override
+    public boolean dispatchTouchEvent(MotionEvent ev) {
+        int action = ev.getActionMasked();
+        if (action == MotionEvent.ACTION_DOWN) {
+            if (touchOpen) cancelWebViewTouch();
+            touchOpen = true;
+        } else if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
+            touchOpen = false;
+        }
+        return super.dispatchTouchEvent(ev);
+    }
+
+    private void cancelWebViewTouch() {
+        touchOpen = false;
+        if (getBridge() == null) return;
+        WebView webView = getBridge().getWebView();
+        if (webView == null) return;
+        long now = SystemClock.uptimeMillis();
+        MotionEvent cancel = MotionEvent.obtain(now, now, MotionEvent.ACTION_CANCEL, 0, 0, 0);
+        webView.dispatchTouchEvent(cancel);
+        cancel.recycle();
+    }
+
     @Override
     public void onWindowFocusChanged(boolean hasFocus) {
         super.onWindowFocusChanged(hasFocus);
+        // A system gesture or overlay that grabs focus mid-touch can leave that touch open too.
+        if (!hasFocus && touchOpen) cancelWebViewTouch();
         // Bars come back after dialogs and ads; hide them again whenever the game regains focus.
         if (hasFocus) hideSystemBars();
     }
