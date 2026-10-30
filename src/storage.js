@@ -34,6 +34,7 @@ export function parseSave(raw, now = Date.now()) {
   S.last = Math.min(num(d.last, now), now);
   S.sound = d.sound !== false;
   S.music = d.music !== false;
+  S.haptics = d.haptics !== false;
   S.notify = d.notify === true;
   S.journalSeen = Math.min(int(d.journalSeen, 0), JOURNAL.length);
   S.podReadyAt = Math.min(num(d.podReadyAt, 0), now + 10 * 60 * 1000); // never more than one cooldown ahead
@@ -61,6 +62,7 @@ export function parseSave(raw, now = Date.now()) {
     comets: int(st.comets, 0), missions: int(st.missions, 0), best: int(st.best, 0),
     ships: int(st.ships, 0), drops: int(st.drops, 0), chests: int(st.chests, 0), capped: int(st.capped, 0),
     night: int(st.night, 0), bare: int(st.bare, 0), bestRun: int(st.bestRun, 0), overdrive: int(st.overdrive, 0),
+    played: Math.max(0, num(st.played, 0)), peak: Math.max(0, num(st.peak, 0)),
   };
   S.stats.ships = Math.min(S.stats.ships, S.stats.comets); // supply ships are a subset of all flyers caught
   S.streak = int(d.streak, 0);

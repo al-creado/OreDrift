@@ -4,6 +4,8 @@ import { GENS } from './data.js';
 import { beltFor, allocateShips } from './belts.js';
 import { drawShip, SHIP_SCALE } from './ships.js';
 
+const flyerRate = (hooks) => (hooks.flyerRate ? hooks.flyerRate() : 1);
+
 const MONO = "'IBM Plex Mono', ui-monospace, Menlo, monospace";
 const TAU = Math.PI * 2;
 const COMET_LIFE = 8;
@@ -14,7 +16,7 @@ const VESSEL_IDS = GENS.map((g) => g.id);
 
 /**
  * hooks: { reduced: bool, frenzyOn(): bool, fleet(): { vesselId: count }, belt(): relocation count,
- *          onCometSpawn?(kind), onCometPing?(kind), onCometMissed?() }  kind is 'ship' (supply ship) or 'comet'
+ *          flyerRate?(): how many times as often flyers come (an event), onCometSpawn?(kind), onCometPing?(kind), onCometMissed?() }  kind is 'ship' (supply ship) or 'comet'
  * Returns the scene controller.
  */
 export function createScene(cv, hooks) {
@@ -82,7 +84,7 @@ export function createScene(cv, hooks) {
     pingT += dt;
     if (pingT >= COMET_PING_S) { pingT = 0; if (hooks.onCometPing) hooks.onCometPing(comet.kind); } // audio clue while it is on screen
     if (comet.t >= comet.life) {
-      comet = null; nextComet = now + cometDelayMs(false, Math.random());
+      comet = null; nextComet = now + cometDelayMs(false, Math.random(), flyerRate(hooks));
       if (hooks.onCometMissed) hooks.onCometMissed(); // it left uncaught
     }
   }
@@ -96,7 +98,7 @@ export function createScene(cv, hooks) {
     if (!comet) return null;
     const q = cometPos(comet), kind = comet.kind;
     comet = null;
-    nextComet = now + cometDelayMs(true, Math.random());
+    nextComet = now + cometDelayMs(true, Math.random(), flyerRate(hooks));
     const colors = kind === 'ship' ? [SHIP_COLOR, '#e0f8ff'] : [ORE, ORE_HI];
     for (let i = 0; i < (REDUCED ? 4 : 14); i++) {
       const a = Math.random() * TAU, sp = 60 + Math.random() * 140;

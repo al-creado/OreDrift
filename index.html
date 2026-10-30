@@ -12,7 +12,7 @@
       <header class="hud"><div class="in">
         <div class="label">Ore in hold</div>
         <div class="ore-row"><span class="ore" id="ore">0</span><span class="unit" title="tonnes">t</span></div>
-        <div class="rates"><span id="rate">+0 t/s</span><span id="tapv">tap +1</span><span class="pill" id="bonus" hidden title="Survey points and commendations"></span><span class="pill hot" id="frenzy" hidden></span></div>
+        <div class="rates"><span id="rate">+0 t/s</span><span id="tapv">tap +1</span><span class="pill" id="bonus" hidden title="Survey points and commendations"></span><span class="pill hot" id="frenzy" hidden></span><span class="pill" id="evpill" hidden></span></div>
       </div></header>
 
       <section class="stage">
@@ -50,6 +50,10 @@
 
         <section class="scroll" id="tab-goals" role="tabpanel" aria-label="Goals" hidden>
           <div class="in list">
+            <div class="sect" id="event-sect">
+              <div class="row"><h2 id="ev-name"></h2><span class="label" id="ev-time"></span></div>
+              <p class="note" id="ev-desc"></p>
+            </div>
             <div class="sect">
               <h2>Daily supply drop</h2>
               <div class="dots" id="dots" role="img" aria-label="Seven day supply streak"></div>
@@ -127,7 +131,10 @@
                 <dt>Taps</dt><dd id="st-taps">0</dd>
                 <dt>Vessels</dt><dd id="st-fleet">0</dd>
                 <dt>Relocations</dt><dd id="st-runs">0</dd>
+                <dt>Time played</dt><dd id="st-played">0 m</dd>
+                <dt>Highest output</dt><dd id="st-peak">0 t/s</dd>
                 <dt>Comets and ships caught</dt><dd id="st-comets">0</dd>
+                <dt>Best catch streak</dt><dd id="st-run-best">0</dd>
                 <dt>Missions done</dt><dd id="st-missions">0</dd>
                 <dt>Best supply streak</dt><dd id="st-best">0 days</dd>
                 <dt>Commendations</dt><dd id="st-ach">0</dd>
@@ -138,6 +145,7 @@
               <h2>Settings</h2>
               <div class="row"><span>Sound effects</span><button class="btn" id="snd" type="button" aria-pressed="true">On</button></div>
               <div class="row"><span>Music</span><button class="btn" id="mus" type="button" aria-pressed="true">On</button></div>
+              <div class="row"><span>Vibration</span><button class="btn" id="hap" type="button" aria-pressed="true">On</button></div>
               <div id="notify-row" class="row" hidden><span>Reminders</span><button class="btn" id="notify" type="button" aria-pressed="false">Off</button></div>
               <div id="adprivacy-row" class="row" hidden><span>Ad privacy choices</span><button class="btn" id="adprivacy" type="button">Open</button></div>
               <button class="btn danger" id="wipe" type="button">Wipe save</button>
@@ -162,6 +170,19 @@
     <div class="journal" id="journal" role="dialog" aria-modal="true" aria-label="Captain's journal" hidden>
       <div class="jhead"><h2>Captain's journal</h2><button class="jx" id="journal-close" type="button" aria-label="Close the journal">✕</button></div>
       <div class="jbody" id="jbody"></div>
+    </div>
+    <div class="welcome" id="welcome" role="dialog" aria-modal="true" aria-labelledby="wel-title" hidden>
+      <div class="sect">
+        <h2 id="wel-title">Welcome back</h2>
+        <p class="wel-ore" id="wel-ore"></p>
+        <dl class="stats">
+          <dt>Away for</dt><dd id="wel-away"></dd>
+          <dt>Hold</dt><dd id="wel-hold"></dd>
+        </dl>
+        <p class="note" id="wel-note"></p>
+        <button class="btn primary" id="wel-double" type="button" hidden></button>
+        <button class="btn" id="wel-ok" type="button">Continue</button>
+      </div>
     </div>
     <div class="achpop" id="achpop" role="status" aria-live="polite" hidden>
       <div class="ico" id="achpop-ico">★</div>

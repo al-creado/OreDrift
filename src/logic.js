@@ -59,8 +59,8 @@ export function fmtDur(sec) {
 export function fresh(now = 0) {
   return {
     ore: 0, total: 0, allTime: 0, taps: 0, points: 0, runs: 0,
-    owned: {}, ups: {}, last: now, sound: true, music: true, ach: {},
-    stats: { comets: 0, missions: 0, best: 0, ships: 0, drops: 0, chests: 0, capped: 0, night: 0, bare: 0, bestRun: 0, overdrive: 0 },
+    owned: {}, ups: {}, last: now, sound: true, music: true, haptics: true, ach: {},
+    stats: { comets: 0, missions: 0, best: 0, ships: 0, drops: 0, chests: 0, capped: 0, night: 0, bare: 0, bestRun: 0, overdrive: 0, played: 0, peak: 0 },
     streak: 0, lastSupply: '', daily: null, frenzyUntil: 0, notify: false, podReadyAt: 0,
     iap: { removeAds: false, starter: false, boost: false }, granted: [], journalSeen: 0,
     gifts: {}, // commendation id -> ore gift waiting to be claimed
@@ -185,6 +185,12 @@ export function applyOffline(S, sec) {
   const capped = sec > OFFLINE_CAP;
   if (capped) S.stats.capped++;
   return { gain: g, capped };
+}
+
+/** Mutates S. Counts seconds of play (not time away) and the highest steady output reached, for the stats list. */
+export function trackPlay(S, sec) {
+  if (sec > 0) S.stats.played += sec;
+  S.stats.peak = Math.max(S.stats.peak, ops(S));
 }
 
 /* ---------- relocate ---------- */
@@ -462,7 +468,35 @@ export function claimSupply(S, date) {
 /* ---------- passing flyers: supply ships and comets ---------- */
 export const FIRST_COMET_MS = 25000;
 /** Delay before the next flyer, from a 0..1 random value. */
-export const cometDelayMs = (caught, r) => (caught ? 50 + r * 60 : 40 + r * 50) * 1000;
+export const cometDelayMs = (caught, r, rate = 1) => (caught ? 50 + r * 60 : 40 + r * 50) * 1000 / rate;
+
+/* ---------- weekly events: no server, they follow the player's local calendar ---------- */
+/** days: getDay() values (0 = Sunday). flyerRate: flyers come this many times as often. cometMult: comets drop this many times the ore. */
+export const EVENTS = [
+  { id: 'meteor', name: 'Meteor weekend', days: [6, 0], flyerRate: 2, cometMult: 1, desc: 'Supply ships and comets fly past twice as often.' },
+  { id: 'rich', name: 'Rich comets', days: [3], flyerRate: 1, cometMult: 2, desc: 'Comets drop double the ore.' },
+];
+const dayAt = (date, n) => new Date(date.getFullYear(), date.getMonth(), date.getDate() + n);
+const eventOn = (date) => EVENTS.find((e) => e.days.includes(date.getDay())) || null;
+/** The event running on this date, with endsAt (ms, the next local midnight after its last day), or null. */
+export function activeEvent(date) {
+  const e = eventOn(date);
+  if (!e) return null;
+  let n = 1;
+  while (n < 8 && eventOn(dayAt(date, n)) === e) n++;
+  return { ...e, endsAt: dayAt(date, n).getTime() };
+}
+/** The next event that starts after this date (not the one already running), with startsAt (ms), or null. */
+export function nextEvent(date) {
+  const now = eventOn(date);
+  for (let n = 1; n <= 7; n++) {
+    const e = eventOn(dayAt(date, n));
+    if (e && e !== now) return { ...e, startsAt: dayAt(date, n).getTime() };
+  }
+  return null;
+}
+export const flyerRate = (date) => (activeEvent(date) || { flyerRate: 1 }).flyerRate;
+export const cometMult = (date) => (activeEvent(date) || { cometMult: 1 }).cometMult;
 
 /** Share of flyers that are supply ships (the rest are comets). */
 export const SUPPLY_SHIP_CHANCE = 0.6;
@@ -495,12 +529,12 @@ export function catchSupplyShip(S, now) {
   return { kind: 'frenzy', sec: SHIP_BOOST_SECONDS };
 }
 
-/** Mutates S. A comet drops a random amount of ore; rand is 0..1. Returns { kind: 'ore', gain, minutes }. */
-export function catchComet(S, rand) {
+/** Mutates S. A comet drops a random amount of ore (times an event's mult); rand is 0..1. Returns { kind: 'ore', gain, minutes }. */
+export function catchComet(S, rand, mult = 1) {
   S.stats.comets++;
   addProg(S, 'comet', 1);
   const minutes = COMET_MIN_MINUTES + rand * (COMET_MAX_MINUTES - COMET_MIN_MINUTES);
-  const g = minutesOfOre(S, minutes, COMET_FLOOR);
+  const g = minutesOfOre(S, minutes, COMET_FLOOR) * mult;
   gain(S, g, true);
   return { kind: 'ore', gain: g, minutes };
 }

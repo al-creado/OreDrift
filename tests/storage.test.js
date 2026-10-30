@@ -24,7 +24,7 @@ describe('parseSave', () => {
     expect(S.ups).toEqual({ bits: true });
     expect(S.ach).toEqual({ t1: true });
     expect(S.gifts).toEqual({ t1: 250 });
-    expect(S.stats).toEqual({ comets: 3, missions: 4, best: 5, ships: 2, drops: 6, chests: 1, capped: 1, night: 0, bare: 0, bestRun: 0, overdrive: 0 });
+    expect(S.stats).toEqual({ comets: 3, missions: 4, best: 5, ships: 2, drops: 6, chests: 1, capped: 1, night: 0, bare: 0, bestRun: 0, overdrive: 0, played: 0, peak: 0 });
     expect(S.daily.missions).toHaveLength(3);
     expect(S.daily.chest).toBe(true);
     expect(parse(serializeState(S, NOW))).toEqual({ ...S, last: NOW });
@@ -72,12 +72,23 @@ describe('parseSave', () => {
     expect(parse(old).gifts).toEqual({});
   });
 
+  it('reads play time and peak output, and an older save has zeros', () => {
+    const S = parse({ ...goodSave(), stats: { comets: 1, played: 3600.5, peak: 42.5 } });
+    expect(S.stats).toMatchObject({ played: 3600.5, peak: 42.5 });
+    expect(parse({ ...goodSave(), stats: { played: -5, peak: 'x' } }).stats).toMatchObject({ played: 0, peak: 0 });
+  });
+  it('vibration defaults on and only an explicit false turns it off', () => {
+    expect(parse({}).haptics).toBe(true);
+    expect(parse({ haptics: false }).haptics).toBe(false);
+    expect(parse({ haptics: 'no' }).haptics).toBe(true);
+  });
+
   it('wrong container types are ignored, not fatal', () => {
     const S = parse({ ...goodSave(), owned: [1, 2], ups: 'x', ach: 5, stats: null, daily: 'x' });
     expect(S.owned).toEqual({});
     expect(S.ups).toEqual({});
     expect(S.ach).toEqual({});
-    expect(S.stats).toEqual({ comets: 0, missions: 0, best: 0, ships: 0, drops: 0, chests: 0, capped: 0, night: 0, bare: 0, bestRun: 0, overdrive: 0 });
+    expect(S.stats).toEqual({ comets: 0, missions: 0, best: 0, ships: 0, drops: 0, chests: 0, capped: 0, night: 0, bare: 0, bestRun: 0, overdrive: 0, played: 0, peak: 0 });
     expect(S.daily).toBeNull();
   });
 
@@ -117,7 +128,7 @@ describe('parseSave', () => {
 
   it('an older save without the newer stats gets zeros, and ships never exceed flyers caught', () => {
     const old = parse({ ...goodSave(), stats: { comets: 7, missions: 2, best: 3 } });
-    expect(old.stats).toEqual({ comets: 7, missions: 2, best: 3, ships: 0, drops: 0, chests: 0, capped: 0, night: 0, bare: 0, bestRun: 0, overdrive: 0 });
+    expect(old.stats).toEqual({ comets: 7, missions: 2, best: 3, ships: 0, drops: 0, chests: 0, capped: 0, night: 0, bare: 0, bestRun: 0, overdrive: 0, played: 0, peak: 0 });
     expect(parse({ ...goodSave(), stats: { comets: 3, ships: 50 } }).stats.ships).toBe(3);
     expect(parse({ ...goodSave(), stats: { comets: 3, ships: -4, drops: 'x', chests: NaN } }).stats).toMatchObject({ ships: 0, drops: 0, chests: 0 });
   });

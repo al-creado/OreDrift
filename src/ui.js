@@ -103,6 +103,42 @@ export function createUI(h) {
     achTimer = setTimeout(nextAchPop, 450); // let it slide out before the next one comes in
   }
 
+  /* ---------- welcome back ---------- */
+  const welcomeOpen = () => !$('welcome').hidden;
+  /** info: { sec, gain, capped }. The ore is already in the hold; this only reports it. */
+  function showWelcome(info) {
+    setText($('wel-ore'), '+' + L.fmt(info.gain) + ' t');
+    setText($('wel-away'), L.fmtDur(info.sec));
+    setText($('wel-hold'), info.capped ? 'Full after 8 h' : 'Not full');
+    setText($('wel-note'), info.capped
+      ? 'Your hold was full after 8 hours, so the rest of your time away did not count.' + (h.onToggleNotify ? ' Turn on Reminders in Settings on the Belt tab to hear when it fills.' : '')
+      : 'Your fleet mines at half rate while you are away, for up to 8 hours.');
+    $('wel-double').hidden = true;
+    $('welcome').hidden = false;
+    $('wel-ok').focus();
+  }
+  /** Shows (label + handler) or hides (null) the optional "double it" button. Returns false when the card is not open. */
+  function setWelcomeOffer(label, onGo) {
+    if (!welcomeOpen()) return false;
+    const b = $('wel-double');
+    b.hidden = !label;
+    if (label) { setText(b, label); b.onclick = onGo; }
+    return true;
+  }
+  function welcomeDoubled(total) {
+    if (!welcomeOpen()) return;
+    setText($('wel-ore'), '+' + L.fmt(total) + ' t');
+    setText($('wel-note'), 'Bonus claimed: your offline earnings were doubled.');
+    $('wel-double').hidden = true;
+  }
+  /** Returns true if the card was open (so the back button knows it handled the press). */
+  function closeWelcome() {
+    if (!welcomeOpen()) return false;
+    $('welcome').hidden = true;
+    return true;
+  }
+  const closeOverlay = () => closeWelcome() || closeJournal();
+
   /* ---------- fleet ---------- */
   const cards = {};
   function buildFleet() {
@@ -207,12 +243,20 @@ export function createUI(h) {
     setText($('st-fleet'), String(L.fleetCount(s)));
     setText($('st-runs'), String(s.runs));
     setText($('st-comets'), String(s.stats.comets)); setText($('st-missions'), String(s.stats.missions));
+    setText($('st-played'), L.fmtDur(s.stats.played)); setText($('st-peak'), L.fmt(s.stats.peak) + ' t/s'); setText($('st-run-best'), String(s.stats.bestRun));
     setText($('st-best'), s.stats.best + (s.stats.best === 1 ? ' day' : ' days')); setText($('st-ach'), L.achCount(s) + ' of ' + ACHS.length);
     setText($('st-rank'), L.rankFor(L.achCount(s)).name);
     setText($('snd'), s.sound ? 'On' : 'Off'); $('snd').setAttribute('aria-pressed', String(s.sound));
     setText($('mus'), s.music ? 'On' : 'Off'); $('mus').setAttribute('aria-pressed', String(s.music));
+    setText($('hap'), s.haptics ? 'On' : 'Off'); $('hap').setAttribute('aria-pressed', String(s.haptics));
     const nb = $('notify');
     if (!$('notify-row').hidden) { setText(nb, s.notify ? 'On' : 'Off'); nb.setAttribute('aria-pressed', String(!!s.notify)); }
+  }
+
+  /** "2d 5h", "5h 12m" or "9m" for a span in milliseconds. */
+  function leftText(ms) {
+    const m = Math.max(1, Math.round(ms / 60000)), d = Math.floor(m / 1440), hr = Math.floor((m % 1440) / 60);
+    return d ? d + 'd ' + hr + 'h' : hr ? hr + 'h ' + (m % 60) + 'm' : m + 'm';
   }
 
   /* ---------- goals ---------- */
@@ -359,6 +403,11 @@ export function createUI(h) {
     setText($('supnote'), can
       ? 'Day ' + nx + ' pays ×' + f + ', about ' + L.fmt(L.supplyReward(s, date)) + ' t. Miss a day and the streak starts over.'
       : 'Collected for today. Streak: ' + s.streak + (s.streak === 1 ? ' day. ' : ' days. ') + (s.streak >= 7 ? 'Bonus is at its maximum.' : 'Come back tomorrow for a bigger drop.'));
+    const ev = L.activeEvent(date), nx_ = ev ? null : L.nextEvent(date), es = $('event-sect');
+    es.classList.toggle('on', !!ev);
+    if (ev) { setText($('ev-name'), ev.name); setText($('ev-time'), 'Ends in ' + leftText(ev.endsAt - date.getTime())); setText($('ev-desc'), ev.desc); }
+    else if (nx_) { setText($('ev-name'), 'Next: ' + nx_.name); setText($('ev-time'), 'In ' + leftText(nx_.startsAt - date.getTime())); setText($('ev-desc'), nx_.desc); }
+    es.hidden = !ev && !nx_;
     const sb = $('supply-btn'); sb.disabled = !can; setText(sb, can ? 'Claim ' + L.fmt(L.supplyReward(s, date)) : 'Collected');
 
     const mid = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1);
@@ -464,6 +513,8 @@ export function createUI(h) {
     const s = S();
     const o = L.ops(s, now);
     setText($('rate'), '+' + L.fmt(o) + ' t/s'); setText($('tapv'), 'tap +' + L.fmt(L.tapValue(s, now, o)));
+    const evNow = L.activeEvent(date), ep = $('evpill');
+    ep.hidden = !evNow; if (evNow) { setText(ep, evNow.name); ep.title = evNow.desc; }
     const b = $('bonus'), bx = L.surveyMult(s) * L.achMult(s) * L.iapMult(s) - 1;
     if (bx >= 0.005) { b.hidden = false; setText(b, '+' + L.fmtPct(bx, 0) + ' bonus'); } else b.hidden = true;
     const fz = $('frenzy');
@@ -513,6 +564,8 @@ export function createUI(h) {
     }));
     $('snd').addEventListener('click', h.onToggleSound);
     $('mus').addEventListener('click', h.onToggleMusic);
+    $('hap').addEventListener('click', h.onToggleHaptics);
+    $('wel-ok').addEventListener('click', closeWelcome);
     $('toast').addEventListener('click', nextToast);
     $('achpop').addEventListener('click', () => {
       const item = achShown;
@@ -534,7 +587,7 @@ export function createUI(h) {
   }
 
   return {
-    init, update, updateOre, toast, achPop, closeJournal, showOffer, hideOffer, markNew, setShopVisible, setAdPrivacy: (on) => { $('adprivacy-row').hidden = !on; }, selectTab, resetUpgradeList, resetAchList,
+    init, update, updateOre, toast, achPop, closeJournal, closeOverlay, showWelcome, setWelcomeOffer, welcomeDoubled, welcomeOpen, showOffer, hideOffer, markNew, setShopVisible, setAdPrivacy: (on) => { $('adprivacy-row').hidden = !on; }, selectTab, resetUpgradeList, resetAchList,
     activeTab: () => activeTab,
   };
 }

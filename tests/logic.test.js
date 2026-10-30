@@ -1090,6 +1090,56 @@ describe("the Captain's journal", () => {
   });
 });
 
+describe('weekly events', () => {
+  const D = (y, m, d) => new Date(y, m - 1, d, 12); // 2026-10-31 is a Saturday
+  it('the meteor weekend runs Saturday and Sunday and ends at Monday midnight', () => {
+    const sat = L.activeEvent(D(2026, 10, 31)), sun = L.activeEvent(D(2026, 11, 1));
+    expect(sat.id).toBe('meteor'); expect(sun.id).toBe('meteor');
+    expect(sat.endsAt).toBe(new Date(2026, 10, 2).getTime());
+    expect(sun.endsAt).toBe(sat.endsAt);
+  });
+  it('rich comets is Wednesday only', () => {
+    const wed = L.activeEvent(D(2026, 11, 4));
+    expect(wed.id).toBe('rich');
+    expect(wed.endsAt).toBe(new Date(2026, 10, 5).getTime());
+    expect(L.activeEvent(D(2026, 11, 2))).toBeNull(); // Monday
+    expect(L.activeEvent(D(2026, 11, 5))).toBeNull(); // Thursday
+  });
+  it('the next event is the one that starts after today, never the one already running', () => {
+    expect(L.nextEvent(D(2026, 10, 31)).id).toBe('rich');            // Saturday: next is Wednesday
+    expect(L.nextEvent(D(2026, 11, 1)).startsAt).toBe(new Date(2026, 10, 4).getTime()); // Sunday
+    expect(L.nextEvent(D(2026, 11, 2)).id).toBe('rich');             // Monday
+    expect(L.nextEvent(D(2026, 11, 4)).id).toBe('meteor');           // Wednesday: next is the weekend
+    expect(L.nextEvent(D(2026, 11, 5)).id).toBe('meteor');           // Thursday
+  });
+  it('rates and comet pay follow the event, and are 1 otherwise', () => {
+    expect(L.flyerRate(D(2026, 10, 31))).toBe(2); expect(L.cometMult(D(2026, 10, 31))).toBe(1);
+    expect(L.flyerRate(D(2026, 11, 4))).toBe(1);  expect(L.cometMult(D(2026, 11, 4))).toBe(2);
+    expect(L.flyerRate(D(2026, 11, 2))).toBe(1);  expect(L.cometMult(D(2026, 11, 2))).toBe(1);
+  });
+  it('a faster flyer rate shortens the delay, and a comet pays its multiple', () => {
+    expect(L.cometDelayMs(false, 0, 2)).toBe(20000);
+    expect(L.cometDelayMs(true, 1, 2)).toBe(55000);
+    const V = L.fresh(0); V.owned = { laser: 10 }; // 20 t/s
+    expect(L.catchComet(V, 0.5, 2).gain).toBe(20 * 60 * 15 * 2);
+  });
+});
+
+describe('play statistics', () => {
+  it('counts time played and keeps the highest output', () => {
+    const S = L.fresh(0); S.owned = { laser: 10 };
+    L.trackPlay(S, 0.25); L.trackPlay(S, 0.25);
+    expect(S.stats.played).toBe(0.5);
+    expect(S.stats.peak).toBe(20);
+    S.owned = { laser: 1 };
+    L.trackPlay(S, 1);
+    expect(S.stats.peak).toBe(20);   // does not go back down
+    expect(S.stats.played).toBe(1.5);
+    L.trackPlay(S, -3);
+    expect(S.stats.played).toBe(1.5); // never negative
+  });
+});
+
 describe('number formatting', () => {
   it('percentages: plain below 1,000%, abbreviated above', () => {
     expect(L.fmtPct(0.01)).toBe('1%');
@@ -1286,7 +1336,7 @@ describe('shop', () => {
 describe('save-shape defaults', () => {
   it('fresh state has the documented fields', () => {
     const S = L.fresh(42);
-    expect(Object.keys(S).sort()).toEqual(['ach', 'allTime', 'daily', 'frenzyUntil', 'gifts', 'last', 'lastSupply', 'owned',
+    expect(Object.keys(S).sort()).toEqual(['ach', 'allTime', 'daily', 'frenzyUntil', 'gifts', 'haptics', 'last', 'lastSupply', 'owned',
       'granted', 'iap', 'journalSeen', 'music', 'notify', 'podReadyAt', 'points', 'ore', 'runs', 'sound', 'stats', 'streak', 'taps', 'total', 'ups'].sort());
     expect(S.last).toBe(42);
     expect(S.sound).toBe(true);
