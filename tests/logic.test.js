@@ -14,6 +14,9 @@ describe('data', () => {
     expect(GENS).toHaveLength(7);
     expect(UPS).toHaveLength(38);
     expect(new Set(UPS.map((x) => x.id)).size).toBe(38);
+    const full = ACHS.find((a) => a.id === 'u2');
+    expect(full.t).toBe(UPS.length);                    // Fully Fitted always asks for every upgrade
+    expect(full.desc).toContain(String(UPS.length));
     expect(ACHS).toHaveLength(69);
     expect(new Set(ACHS.map((a) => a.id)).size).toBe(69);
   });
@@ -691,7 +694,7 @@ describe('daily missions', () => {
 describe('commendations', () => {
   const ORIGINAL = {
     t1: 100, t2: 1000, t3: 10000, t4: 100000, o1: 1000, o2: 1e6, o3: 1e9, o4: 1e12,
-    f1: 10, f2: 50, f3: 150, f4: 400, k1: 3, k2: 5, k3: 7, u1: 3, u2: 9,
+    f1: 10, f2: 50, f3: 150, f4: 400, k1: 3, k2: 5, k3: 7, u1: 3, u2: UPS.length, /* every upgrade, so it follows the list */
     r1: 1, r2: 5, r3: 10, c1: 1, c2: 25, c3: 100, m1: 3, m2: 30, m3: 100,
     s1: 3, s2: 7, s3: 30, p1: 100, p2: 10000, p3: 1e6,
   };

@@ -122,7 +122,7 @@ export const ACHS = [
   ach('v3', 'Fleet', 3, 'Mass Production', 'Own 200 of one kind of vessel.', 200, 'maxVessel', NEW),
   // Upgrades
   ach('u1', 'Upgrades', 1, 'Tooled Up', 'Install 3 upgrades in one run.', 3, 'upgrades'),
-  ach('u2', 'Upgrades', 2, 'Fully Fitted', 'Install 9 upgrades in one run.', 9, 'upgrades'),
+  ach('u2', 'Upgrades', 2, 'Fully Fitted', 'Install all ' + UPS.length + ' upgrades in one run.', UPS.length, 'upgrades'),
   // Belts
   ach('r1', 'Belts', 1, 'New Horizons', 'Relocate to a new belt.', 1, 'runs'),
   ach('r2', 'Belts', 2, 'Belt Hopper', 'Relocate 5 times.', 5, 'runs'),
