@@ -22,11 +22,11 @@ Tap a glowing asteroid and start mining. Hire drones, laser rigs and orbital fou
 **What you do**
 - Tap the asteroid to mine ore. Every tap counts.
 - Hire seven kinds of automatic miners, from a small Mining Drone to a Stellar Collector. Each one doubles its output when you own 10, 25, 50, 100, 150 and 200 of it.
-- Install nine upgrades that boost taps and your whole fleet.
+- Install upgrades that boost taps, your whole fleet, or a single kind of vessel. New ones keep appearing as you grow.
 - Catch passing supply ships for a temporary x7 output boost, and comets for a random pile of ore.
 - Collect a daily supply drop. Come back on consecutive days for bigger rewards, up to two and a half times the base.
 - Finish three new daily missions, then open the daily cache.
-- Earn 69 commendations, from Bronze to Platinum, with eight secret ones to discover. Read the Captain's journal, a story of the Drift that unlocks chapter by chapter (and may drop a hint or two). Each gives a permanent output bonus and a one-time ore gift, and they raise your rank from Rookie to Legend.
+- Earn 71 commendations, from Bronze to Platinum, with eight secret ones to discover. Read the Captain's journal, a story of the Drift that unlocks chapter by chapter (and may drop a hint or two). Each gives a permanent output bonus and a one-time ore gift, and they raise your rank from Rookie to Legend.
 - Relocate to a new belt to earn survey points. Each point adds +10% to all output and taps, and you keep them forever.
 
 **Made to fit your day**

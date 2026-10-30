@@ -59,8 +59,8 @@ export function fmtDur(sec) {
 export function fresh(now = 0) {
   return {
     ore: 0, total: 0, allTime: 0, taps: 0, points: 0, runs: 0,
-    owned: {}, ups: {}, last: now, sound: true, music: true, ach: {},
-    stats: { comets: 0, missions: 0, best: 0, ships: 0, drops: 0, chests: 0, capped: 0, night: 0, bare: 0, bestRun: 0, overdrive: 0 },
+    owned: {}, ups: {}, last: now, sound: true, music: true, haptics: true, ach: {},
+    stats: { comets: 0, missions: 0, best: 0, ships: 0, drops: 0, chests: 0, capped: 0, night: 0, bare: 0, bestRun: 0, overdrive: 0, played: 0, peak: 0 },
     streak: 0, lastSupply: '', daily: null, frenzyUntil: 0, notify: false, podReadyAt: 0,
     iap: { removeAds: false, starter: false, boost: false }, granted: [], journalSeen: 0,
     gifts: {}, // commendation id -> ore gift waiting to be claimed
@@ -139,7 +139,13 @@ export function maxBuy(S, g) {
 export const buyQty = (S, g, mode) => (mode === 'max' ? Math.max(1, maxBuy(S, g)) : mode);
 
 export const revealed = (S, g, i) => i === 0 || own(S, g.id) > 0 || S.total >= g.base * 0.4;
-export const visibleUps = (S) => UPS.filter((u) => !S.ups[u.id] && S.total >= u.cost * 0.3);
+/** An upgrade is listed once this run has mined 30% of its cost; the list is cheapest first. */
+export const visibleUps = (S) => UPS.filter((u) => !S.ups[u.id] && S.total >= u.cost * 0.3).sort((a, b) => a.cost - b.cost);
+/** The cheapest upgrade not yet listed, with the ore to mine this run to reveal it: { up, ore }. Null when none are left. */
+export function nextUpgrade(S) {
+  const up = UPS.filter((u) => !S.ups[u.id] && S.total < u.cost * 0.3).sort((a, b) => a.cost - b.cost)[0];
+  return up ? { up, ore: up.cost * 0.3 } : null;
+}
 
 /** Mutates S. Returns { ok, n, cost, milestones: [k...] }. */
 export function buyVessel(S, g, mode) {
@@ -185,6 +191,12 @@ export function applyOffline(S, sec) {
   const capped = sec > OFFLINE_CAP;
   if (capped) S.stats.capped++;
   return { gain: g, capped };
+}
+
+/** Mutates S. Counts seconds of play (not time away) and the highest steady output reached, for the stats list. */
+export function trackPlay(S, sec) {
+  if (sec > 0) S.stats.played += sec;
+  S.stats.peak = Math.max(S.stats.peak, ops(S));
 }
 
 /* ---------- relocate ---------- */
@@ -367,21 +379,40 @@ export function makeMissions(day, allTime) {
     const j = Math.floor(r() * (i + 1));
     const x = types[i]; types[i] = types[j]; types[j] = x;
   }
-  return types.slice(0, 3).map((type) => {
-    let target;
-    if (type === 'tap') target = TAP_TARGETS[Math.floor(r() * 3)];
-    else if (type === 'mine') target = niceRound(Math.max(3000, allTime * 0.04));
-    else if (type === 'buy') target = 8 + Math.floor(r() * 13);
-    else target = 2 + Math.floor(r() * 3);
-    return { type, target, progress: 0, claimed: false };
-  });
+  return types.slice(0, 3).map((type) => ({ type, target: missionTarget(type, allTime, r), progress: 0, claimed: false }));
+}
+/** The goal for one mission type; r is a 0..1 generator. */
+function missionTarget(type, allTime, r) {
+  if (type === 'tap') return TAP_TARGETS[Math.floor(r() * 3)];
+  if (type === 'mine') return niceRound(Math.max(3000, allTime * 0.04));
+  if (type === 'buy') return 8 + Math.floor(r() * 13);
+  return 2 + Math.floor(r() * 3);
+}
+
+/** The first swap of each day is free; later ones need a bonus ad (free when ads are removed). */
+export const FREE_SWAPS = 1;
+export const swapIsFree = (S) => !S.daily || (S.daily.swaps || 0) < FREE_SWAPS || adsRemoved(S);
+/** A mission can be swapped while it is neither finished nor claimed. */
+export const canSwap = (S, i) => { const m = S.daily && S.daily.missions[i]; return !!m && !m.claimed && m.progress < m.target; };
+/**
+ * Mutates S. Replaces mission i with the kind of mission that is not on today's list (so the three stay different),
+ * with a goal drawn from the day and the swap count, so the same swap always gives the same mission. Returns the new mission or null.
+ */
+export function swapMission(S, i) {
+  if (!canSwap(S, i)) return null;
+  const D = S.daily, n = D.swaps || 0, used = D.missions.map((m) => m.type);
+  const type = MISSION_TYPES.find((t) => !used.includes(t));
+  if (!type) return null;
+  D.missions[i] = { type, target: missionTarget(type, S.allTime, rng(hashStr(D.day + ':swap:' + n))), progress: 0, claimed: false };
+  D.swaps = n + 1;
+  return D.missions[i];
 }
 
 /** Regenerates missions if the day changed. Mutates S. Returns true when it did. */
 export function ensureDaily(S, date) {
   const d = dayKey(date);
   if (!S.daily || S.daily.day !== d) {
-    S.daily = { day: d, missions: makeMissions(d, S.allTime), chest: false };
+    S.daily = { day: d, missions: makeMissions(d, S.allTime), chest: false, swaps: 0 };
     return true;
   }
   return false;
@@ -462,7 +493,35 @@ export function claimSupply(S, date) {
 /* ---------- passing flyers: supply ships and comets ---------- */
 export const FIRST_COMET_MS = 25000;
 /** Delay before the next flyer, from a 0..1 random value. */
-export const cometDelayMs = (caught, r) => (caught ? 50 + r * 60 : 40 + r * 50) * 1000;
+export const cometDelayMs = (caught, r, rate = 1) => (caught ? 50 + r * 60 : 40 + r * 50) * 1000 / rate;
+
+/* ---------- weekly events: no server, they follow the player's local calendar ---------- */
+/** days: getDay() values (0 = Sunday). flyerRate: flyers come this many times as often. cometMult: comets drop this many times the ore. */
+export const EVENTS = [
+  { id: 'meteor', name: 'Meteor weekend', days: [6, 0], flyerRate: 2, cometMult: 1, desc: 'Supply ships and comets fly past twice as often.' },
+  { id: 'rich', name: 'Rich comets', days: [3], flyerRate: 1, cometMult: 2, desc: 'Comets drop double the ore.' },
+];
+const dayAt = (date, n) => new Date(date.getFullYear(), date.getMonth(), date.getDate() + n);
+const eventOn = (date) => EVENTS.find((e) => e.days.includes(date.getDay())) || null;
+/** The event running on this date, with endsAt (ms, the next local midnight after its last day), or null. */
+export function activeEvent(date) {
+  const e = eventOn(date);
+  if (!e) return null;
+  let n = 1;
+  while (n < 8 && eventOn(dayAt(date, n)) === e) n++;
+  return { ...e, endsAt: dayAt(date, n).getTime() };
+}
+/** The next event that starts after this date (not the one already running), with startsAt (ms), or null. */
+export function nextEvent(date) {
+  const now = eventOn(date);
+  for (let n = 1; n <= 7; n++) {
+    const e = eventOn(dayAt(date, n));
+    if (e && e !== now) return { ...e, startsAt: dayAt(date, n).getTime() };
+  }
+  return null;
+}
+export const flyerRate = (date) => (activeEvent(date) || { flyerRate: 1 }).flyerRate;
+export const cometMult = (date) => (activeEvent(date) || { cometMult: 1 }).cometMult;
 
 /** Share of flyers that are supply ships (the rest are comets). */
 export const SUPPLY_SHIP_CHANCE = 0.6;
@@ -495,12 +554,12 @@ export function catchSupplyShip(S, now) {
   return { kind: 'frenzy', sec: SHIP_BOOST_SECONDS };
 }
 
-/** Mutates S. A comet drops a random amount of ore; rand is 0..1. Returns { kind: 'ore', gain, minutes }. */
-export function catchComet(S, rand) {
+/** Mutates S. A comet drops a random amount of ore (times an event's mult); rand is 0..1. Returns { kind: 'ore', gain, minutes }. */
+export function catchComet(S, rand, mult = 1) {
   S.stats.comets++;
   addProg(S, 'comet', 1);
   const minutes = COMET_MIN_MINUTES + rand * (COMET_MAX_MINUTES - COMET_MIN_MINUTES);
-  const g = minutesOfOre(S, minutes, COMET_FLOOR);
+  const g = minutesOfOre(S, minutes, COMET_FLOOR) * mult;
   gain(S, g, true);
   return { kind: 'ore', gain: g, minutes };
 }

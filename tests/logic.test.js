@@ -10,11 +10,15 @@ const D = (y, m, d) => new Date(y, m - 1, d, 12);
 const state = (patch = {}) => Object.assign(L.fresh(NOW), patch);
 
 describe('data', () => {
-  it('has 7 vessels, 9 upgrades and 69 commendations with unique ids', () => {
+  it('has 7 vessels, 15 upgrades and 71 commendations with unique ids', () => {
     expect(GENS).toHaveLength(7);
-    expect(UPS).toHaveLength(9);
-    expect(ACHS).toHaveLength(69);
-    expect(new Set(ACHS.map((a) => a.id)).size).toBe(69);
+    expect(UPS).toHaveLength(15);
+    expect(new Set(UPS.map((x) => x.id)).size).toBe(15);
+    const tiers = ['u1', 'u2', 'u3', 'u4'].map((id) => ACHS.find((a) => a.id === id));
+    expect(tiers.map((a) => a.t)).toEqual([3, 6, 10, UPS.length]);   // spread across the list; the last always asks for every upgrade
+    expect(tiers[3].desc).toContain(String(UPS.length));
+    expect(ACHS).toHaveLength(71);
+    expect(new Set(ACHS.map((a) => a.id)).size).toBe(71);
   });
 });
 
@@ -186,7 +190,7 @@ describe('output and tap formulas', () => {
   });
 
   it('with every upgrade, survey points and commendations', () => {
-    const S = state({ points: 2, ups: Object.fromEntries(UPS.map((x) => [x.id, true])), owned: { drone: 10 } });
+    const S = state({ points: 2, ups: Object.fromEntries(UPS.slice(0, 9).map((x) => [x.id, true])), owned: { drone: 10 } }); // the original nine
     S.ach = { t1: true, t2: true };
     const o = L.ops(S);
     // output: 10*0.1*2 = 2, tunes 1.25*1.5*2 = 3.75, survey 1.2, ach 1.02
@@ -690,7 +694,7 @@ describe('daily missions', () => {
 describe('commendations', () => {
   const ORIGINAL = {
     t1: 100, t2: 1000, t3: 10000, t4: 100000, o1: 1000, o2: 1e6, o3: 1e9, o4: 1e12,
-    f1: 10, f2: 50, f3: 150, f4: 400, k1: 3, k2: 5, k3: 7, u1: 3, u2: 9,
+    f1: 10, f2: 50, f3: 150, f4: 400, k1: 3, k2: 5, k3: 7, u1: 3, u2: 6,
     r1: 1, r2: 5, r3: 10, c1: 1, c2: 25, c3: 100, m1: 3, m2: 30, m3: 100,
     s1: 3, s2: 7, s3: 30, p1: 100, p2: 10000, p3: 1e6,
   };
@@ -731,7 +735,7 @@ describe('commendations', () => {
       expect(L.achBonus(a)).toBe(0.01);
       expect(a.secret).toBeUndefined();
     }
-    expect(NEW_IDS).toHaveLength(37);
+    expect(NEW_IDS).toHaveLength(39);
   });
 
   it('every commendation has a known group and a tier, and the new ones give +0.5%', () => {
@@ -748,8 +752,8 @@ describe('commendations', () => {
   describe('chains (one tile for Bronze, Silver, Gold...)', () => {
     it('puts every commendation in exactly one chain, giving 26 tiles', () => {
       const ids = L.CHAINS.flatMap((c) => c.steps.map((a) => a.id));
-      expect(ids).toHaveLength(69);
-      expect(new Set(ids).size).toBe(69);
+      expect(ids).toHaveLength(71);
+      expect(new Set(ids).size).toBe(71);
       expect(L.CHAINS).toHaveLength(26);
       expect(new Set(L.CHAINS.map((c) => c.id)).size).toBe(26);
       for (const a of ACHS) expect(a.chain, a.id).toBeTruthy();
@@ -904,10 +908,10 @@ describe('commendations', () => {
       expect(L.achBonusTotal(S)).toBeCloseTo(0.02, 12);
       expect(L.ops(S)).toBeCloseTo(20 * 1.02, 9);
     });
-    it('earning all 69 adds 32% + 18.5%', () => {
+    it('earning all 71 adds 32% + 19.5%', () => {
       const S = state();
       S.ach = Object.fromEntries(ACHS.map((a) => [a.id, true]));
-      expect(L.achBonusTotal(S)).toBeCloseTo(0.32 + 0.185, 9);
+      expect(L.achBonusTotal(S)).toBeCloseTo(0.32 + 0.195, 9);
     });
   });
 
@@ -1087,6 +1091,145 @@ describe("the Captain's journal", () => {
 
   it('every chapter that needs something says what', () => {
     for (const c of JOURNAL.slice(1)) expect(c.req.length, c.id).toBeGreaterThan(0);
+  });
+});
+
+describe('late-game upgrades', () => {
+  it('has 15 upgrades: the original nine, then six boosts that start where those end', () => {
+    expect(UPS.slice(0, 9).map((x) => x.id)).toEqual(['bits', 'tune1', 'uplink', 'plasma', 'tune2', 'hammer', 'uplink2', 'tune3', 'pulse']);
+    const late = UPS.slice(9);
+    expect(late.map((x) => x.id)).toEqual(['tune4', 'uplink3', 'tune5', 'singular', 'tune6', 'tune7']);
+    expect(late.every((x) => x.cost > UPS[8].cost)).toBe(true);
+    const costs = late.map((x) => x.cost);
+    expect(costs).toEqual([...costs].sort((a, b) => a - b));
+  });
+  it('the new boosts do what they say', () => {
+    expect(L.tapValue(state({ ups: { uplink3: true } }), NOW, 1000)).toBeCloseTo(1 + 250, 9);
+    expect(L.tapValue(state({ ups: { singular: true } }), NOW, 0)).toBeCloseTo(10, 9);
+    expect(L.prodMult(state({ ups: { tune4: true, tune5: true } }))).toBeCloseTo(5, 9);
+    expect(L.prodMult(state({ ups: { tune6: true, tune7: true } }))).toBeCloseTo(12, 9);
+  });
+  it('the list is sorted by cost, cheapest first', () => {
+    const S = state({ total: 1e13 });
+    const costs = L.visibleUps(S).map((x) => x.cost);
+    expect(costs.length).toBeGreaterThan(5);
+    expect(costs).toEqual([...costs].sort((a, b) => a - b));
+  });
+  it('the next upgrade is the cheapest one not listed yet, with the ore that reveals it', () => {
+    expect(L.nextUpgrade(state({ total: 0 }))).toMatchObject({ up: { id: 'bits' }, ore: 30 });
+    expect(L.nextUpgrade(state({ total: 3e9 })).up.id).toBe('tune4');
+    expect(L.nextUpgrade(state({ total: 1e30 }))).toBeNull();
+  });
+  it('the Upgrades commendations are spread across the list', () => {
+    const S = state();
+    for (const [n, id] of [[3, 'u1'], [6, 'u2'], [10, 'u3'], [UPS.length, 'u4']]) {
+      S.ups = Object.fromEntries(UPS.slice(0, n - 1).map((x) => [x.id, true]));
+      L.checkAch(S); expect(!!S.ach[id], id + ' one short').toBe(false);
+      S.ups = Object.fromEntries(UPS.slice(0, n).map((x) => [x.id, true]));
+      L.checkAch(S); expect(S.ach[id], id).toBe(true);
+    }
+  });
+});
+
+describe('swapping a daily mission', () => {
+  const daily = (extra = {}) => {
+    const S = L.fresh(0); S.allTime = 1e6;
+    L.ensureDaily(S, new Date(2026, 10, 2));
+    return Object.assign(S, extra);
+  };
+  it('replaces the mission with the type that is not on the list, so the three stay different', () => {
+    const S = daily(), before = S.daily.missions.map((m) => m.type);
+    const spare = ['tap', 'mine', 'buy', 'comet'].find((t) => !before.includes(t));
+    const m = L.swapMission(S, 1);
+    expect(m.type).toBe(spare);
+    expect(S.daily.missions[1]).toEqual(m);
+    expect(m).toMatchObject({ progress: 0, claimed: false });
+    expect(new Set(S.daily.missions.map((x) => x.type)).size).toBe(3);
+    expect(S.daily.missions[0].type).toBe(before[0]); // the others are untouched
+    expect(S.daily.missions[2].type).toBe(before[2]);
+  });
+  it('the same swap always gives the same mission, and the next swap differs from it', () => {
+    const a = daily(), b = daily();
+    expect(L.swapMission(a, 0)).toEqual(L.swapMission(b, 0));
+    expect(a.daily.swaps).toBe(1);
+    const again = L.swapMission(a, 0);
+    expect(again.type).not.toBe(a.daily.missions[1].type);
+  });
+  it('cannot swap a finished or claimed mission, or one that does not exist', () => {
+    const S = daily();
+    S.daily.missions[0].progress = S.daily.missions[0].target;
+    expect(L.canSwap(S, 0)).toBe(false); expect(L.swapMission(S, 0)).toBeNull();
+    S.daily.missions[1].claimed = true;
+    expect(L.canSwap(S, 1)).toBe(false);
+    expect(L.canSwap(S, 2)).toBe(true);
+    expect(L.canSwap(S, 7)).toBe(false);
+    expect(L.canSwap(L.fresh(0), 0)).toBe(false); // no missions yet
+    expect(S.daily.swaps).toBe(0);                // nothing was spent
+  });
+  it('the first swap of the day is free, later ones are not unless ads are removed', () => {
+    const S = daily();
+    expect(L.swapIsFree(S)).toBe(true);
+    L.swapMission(S, 0);
+    expect(L.swapIsFree(S)).toBe(false);
+    S.iap.removeAds = true;
+    expect(L.swapIsFree(S)).toBe(true);
+  });
+  it('a new day starts with a free swap again', () => {
+    const S = daily();
+    L.swapMission(S, 0);
+    L.ensureDaily(S, new Date(2026, 10, 3));
+    expect(S.daily.swaps).toBe(0);
+    expect(L.swapIsFree(S)).toBe(true);
+  });
+});
+
+describe('weekly events', () => {
+  const D = (y, m, d) => new Date(y, m - 1, d, 12); // 2026-10-31 is a Saturday
+  it('the meteor weekend runs Saturday and Sunday and ends at Monday midnight', () => {
+    const sat = L.activeEvent(D(2026, 10, 31)), sun = L.activeEvent(D(2026, 11, 1));
+    expect(sat.id).toBe('meteor'); expect(sun.id).toBe('meteor');
+    expect(sat.endsAt).toBe(new Date(2026, 10, 2).getTime());
+    expect(sun.endsAt).toBe(sat.endsAt);
+  });
+  it('rich comets is Wednesday only', () => {
+    const wed = L.activeEvent(D(2026, 11, 4));
+    expect(wed.id).toBe('rich');
+    expect(wed.endsAt).toBe(new Date(2026, 10, 5).getTime());
+    expect(L.activeEvent(D(2026, 11, 2))).toBeNull(); // Monday
+    expect(L.activeEvent(D(2026, 11, 5))).toBeNull(); // Thursday
+  });
+  it('the next event is the one that starts after today, never the one already running', () => {
+    expect(L.nextEvent(D(2026, 10, 31)).id).toBe('rich');            // Saturday: next is Wednesday
+    expect(L.nextEvent(D(2026, 11, 1)).startsAt).toBe(new Date(2026, 10, 4).getTime()); // Sunday
+    expect(L.nextEvent(D(2026, 11, 2)).id).toBe('rich');             // Monday
+    expect(L.nextEvent(D(2026, 11, 4)).id).toBe('meteor');           // Wednesday: next is the weekend
+    expect(L.nextEvent(D(2026, 11, 5)).id).toBe('meteor');           // Thursday
+  });
+  it('rates and comet pay follow the event, and are 1 otherwise', () => {
+    expect(L.flyerRate(D(2026, 10, 31))).toBe(2); expect(L.cometMult(D(2026, 10, 31))).toBe(1);
+    expect(L.flyerRate(D(2026, 11, 4))).toBe(1);  expect(L.cometMult(D(2026, 11, 4))).toBe(2);
+    expect(L.flyerRate(D(2026, 11, 2))).toBe(1);  expect(L.cometMult(D(2026, 11, 2))).toBe(1);
+  });
+  it('a faster flyer rate shortens the delay, and a comet pays its multiple', () => {
+    expect(L.cometDelayMs(false, 0, 2)).toBe(20000);
+    expect(L.cometDelayMs(true, 1, 2)).toBe(55000);
+    const V = L.fresh(0); V.owned = { laser: 10 }; // 20 t/s
+    expect(L.catchComet(V, 0.5, 2).gain).toBe(20 * 60 * 15 * 2);
+  });
+});
+
+describe('play statistics', () => {
+  it('counts time played and keeps the highest output', () => {
+    const S = L.fresh(0); S.owned = { laser: 10 };
+    L.trackPlay(S, 0.25); L.trackPlay(S, 0.25);
+    expect(S.stats.played).toBe(0.5);
+    expect(S.stats.peak).toBe(20);
+    S.owned = { laser: 1 };
+    L.trackPlay(S, 1);
+    expect(S.stats.peak).toBe(20);   // does not go back down
+    expect(S.stats.played).toBe(1.5);
+    L.trackPlay(S, -3);
+    expect(S.stats.played).toBe(1.5); // never negative
   });
 });
 
@@ -1286,7 +1429,7 @@ describe('shop', () => {
 describe('save-shape defaults', () => {
   it('fresh state has the documented fields', () => {
     const S = L.fresh(42);
-    expect(Object.keys(S).sort()).toEqual(['ach', 'allTime', 'daily', 'frenzyUntil', 'gifts', 'last', 'lastSupply', 'owned',
+    expect(Object.keys(S).sort()).toEqual(['ach', 'allTime', 'daily', 'frenzyUntil', 'gifts', 'haptics', 'last', 'lastSupply', 'owned',
       'granted', 'iap', 'journalSeen', 'music', 'notify', 'podReadyAt', 'points', 'ore', 'runs', 'sound', 'stats', 'streak', 'taps', 'total', 'ups'].sort());
     expect(S.last).toBe(42);
     expect(S.sound).toBe(true);

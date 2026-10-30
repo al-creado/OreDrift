@@ -9,7 +9,11 @@ import { LocalNotifications } from '@capacitor/local-notifications';
 export const isNative = () => { try { return Capacitor.isNativePlatform(); } catch (e) { return false; } };
 const quiet = (p) => { try { return Promise.resolve(p).catch(() => {}); } catch (e) { return Promise.resolve(); } };
 
+let hapticsOn = true;
+export function setHapticsEnabled(on) { hapticsOn = !!on; }
+
 export function impact(heavy) {
+  if (!hapticsOn) return;
   if (!isNative()) { try { navigator.vibrate && navigator.vibrate(heavy ? 20 : 5); } catch (e) { /* ignore */ } return; }
   quiet(Haptics.impact({ style: heavy ? ImpactStyle.Medium : ImpactStyle.Light }));
 }

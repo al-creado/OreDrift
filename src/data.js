@@ -31,6 +31,13 @@ export const UPS = [
   { id: 'uplink2', name: 'Swarm Uplink', desc: 'Each tap also mines another 10% of your ore per second.', cost: 5e7, link: 0.1 },
   { id: 'tune3', name: 'Fleet Tuning III', desc: 'All vessels work twice as fast.', cost: 3e8, prod: 2 },
   { id: 'pulse', name: 'Gravity Pulse', desc: 'Every tap mines five times as much.', cost: 5e9, tap: 5 },
+  // Late game: six more boosts that start where the first nine leave off, so the tab has something to offer deep into a run.
+  { id: 'tune4', name: 'Fleet Tuning IV', desc: 'All vessels work twice as fast.', cost: 2e11, prod: 2 },
+  { id: 'uplink3', name: 'Quantum Uplink', desc: 'Each tap also mines another 25% of your ore per second.', cost: 2e12, link: 0.25 },
+  { id: 'tune5', name: 'Fleet Tuning V', desc: 'All vessels work two and a half times as fast.', cost: 5e13, prod: 2.5 },
+  { id: 'singular', name: 'Singularity Drill', desc: 'Every tap mines ten times as much.', cost: 2e14, tap: 10 },
+  { id: 'tune6', name: 'Fleet Tuning VI', desc: 'All vessels work three times as fast.', cost: 1e16, prod: 3 },
+  { id: 'tune7', name: 'Fleet Tuning VII', desc: 'All vessels work four times as fast.', cost: 3e18, prod: 4 },
 ];
 
 export const MISSION_TYPES = ['tap', 'mine', 'buy', 'comet'];
@@ -94,7 +101,10 @@ export const ACHS = [
   ach('v3', 'Fleet', 3, 'Mass Production', 'Own 200 of one kind of vessel.', 200, 'maxVessel', NEW),
   // Upgrades
   ach('u1', 'Upgrades', 1, 'Tooled Up', 'Install 3 upgrades in one run.', 3, 'upgrades'),
-  ach('u2', 'Upgrades', 2, 'Fully Fitted', 'Install every upgrade in one run.', UPS.length, 'upgrades'),
+  // The tiers are spread across the whole upgrade list: 20%, 40%, about two thirds, and all of them.
+  ach('u2', 'Upgrades', 2, 'Well Equipped', 'Install 6 upgrades in one run.', 6, 'upgrades'),
+  ach('u3', 'Upgrades', 3, 'Master Fitter', 'Install 10 upgrades in one run.', 10, 'upgrades', NEW),
+  ach('u4', 'Upgrades', 4, 'Fully Fitted', 'Install all ' + UPS.length + ' upgrades in one run.', UPS.length, 'upgrades', NEW),
   // Belts
   ach('r1', 'Belts', 1, 'New Horizons', 'Relocate to a new belt.', 1, 'runs'),
   ach('r2', 'Belts', 2, 'Belt Hopper', 'Relocate 5 times.', 5, 'runs'),
@@ -157,7 +167,7 @@ export const CHAIN_IDS = {
   fleet: ['f1', 'f2', 'f3', 'f4', 'f5'],
   kinds: ['k1', 'k2', 'k3'],
   specialist: ['v1', 'v2', 'v3'],
-  upgrades: ['u1', 'u2'],
+  upgrades: ['u1', 'u2', 'u3', 'u4'],
   relocations: ['r1', 'r2', 'r3', 'r4'],
   ringed: ['rb1'],
   spectrum: ['rb2'],

@@ -42,10 +42,12 @@ let knownChapters = -1;  // journal chapters seen unlocked so far (-1 until the 
 const save = () => saveState(S, Date.now());
 
 /* ---------- earning ---------- */
+const WELCOME_MIN_SEC = 120; // shorter absences get a toast, not the welcome-back card
 function offline(sec) {
   const r = L.applyOffline(S, sec);
   if (!r) return;
-  ui.toast('Away ' + L.fmtDur(sec) + '. Your fleet mined +' + L.fmt(r.gain) + ' t at half rate' + (r.capped ? ' (capped at 8 h).' : '.'), 9000);
+  if (sec >= WELCOME_MIN_SEC) ui.showWelcome({ sec, gain: r.gain, capped: r.capped });
+  else ui.toast('Away ' + L.fmtDur(sec) + '. Your fleet mined +' + L.fmt(r.gain) + ' t at half rate' + (r.capped ? ' (capped at 8 h).' : '.'), 9000);
   offerDouble(r.gain);
 }
 
@@ -58,12 +60,13 @@ let pendingDouble = 0; // offline earnings seen before ads finished starting
 function offerDouble(amount) {
   if (!rewardsOpen()) { pendingDouble = amount; return; }
   pendingDouble = 0;
-  const free = L.adsRemoved(S);
-  ui.showOffer('Double your offline earnings?', (free ? 'Claim +' : 'Watch ad +') + L.fmt(amount), async () => {
-    ui.hideOffer();
+  const free = L.adsRemoved(S), label = (free ? 'Claim +' : 'Watch ad +') + L.fmt(amount);
+  const go = async () => {
+    ui.hideOffer(); ui.setWelcomeOffer(null);
     const res = await getReward();
     if (res === 'rewarded') {
       L.gain(S, amount);
+      ui.welcomeDoubled(amount * 2);
       ui.toast('Bonus! +' + L.fmt(amount) + ' t.', 3500);
       sounds.claim();
       refresh(); save();
@@ -74,14 +77,15 @@ function offerDouble(amount) {
       ui.toast('No ad available right now. Try again in a moment.', 3500);
       offerDouble(amount);
     }
-  });
+  };
+  if (!ui.setWelcomeOffer(label, go)) ui.showOffer('Double your offline earnings?', label, go); // inside the welcome card when it is open
 }
 
 function tick(now) {
   const dt = (now - lastT) / 1000;
   lastT = now;
   if (dt <= 0) return;
-  if (dt > 60) offline(dt); else L.gain(S, L.ops(S, now) * dt);
+  if (dt > 60) offline(dt); else { L.gain(S, L.ops(S, now) * dt); L.trackPlay(S, dt); }
 }
 
 /* ---------- housekeeping: new day, new commendations ---------- */
@@ -111,7 +115,7 @@ function announceAch(list) {
   ui.markNew(list.map((a) => a.id));
   if (list.length <= 3) {
     list.forEach((a, i) => ui.achPop({
-      kicker: 'Commendation earned', name: a.name, tier: a.tier, sub: a.desc,
+      kicker: 'Commendation earned', chain: a.chain, name: a.name, tier: a.tier, sub: a.desc,
       reward: '+' + pctText(L.achBonus(a)) + ' output and taps · ' + L.fmt(gifts[i]) + ' t to claim on Goals',
     }));
   } else {
@@ -139,6 +143,7 @@ function refresh() {
   const now = Date.now();
   housekeeping(now);
   setSoundEnabled(S.sound);
+  native.setHapticsEnabled(S.haptics);
   ui.update(now, new Date(now));
 }
 
@@ -158,8 +163,8 @@ function catchComet() {
     const r = L.catchSupplyShip(S, now);
     ui.toast('Supply ship! Output ×' + FRENZY_MULT + ' for ' + r.sec + ' s.', 3500);
   } else {
-    const r = L.catchComet(S, Math.random());
-    ui.toast('Comet! +' + L.fmt(r.gain) + ' t of ore.', 3500);
+    const mult = L.cometMult(new Date(now)), r = L.catchComet(S, Math.random(), mult);
+    ui.toast('Comet! +' + L.fmt(r.gain) + ' t of ore' + (mult > 1 ? ' (×' + mult + ' event)' : '') + '.', 3500);
   }
   catchRun++;
   L.noteCatchRun(S, catchRun);
@@ -210,6 +215,24 @@ function onClaimMission(i) {
   ui.toast('Mission complete. +' + L.fmt(g) + ' t.');
   sounds.claim();
   refresh(); save();
+}
+
+let swapping = false;
+/** Replaces one unfinished daily mission. The first swap of the day is free; later ones ask for a bonus ad. */
+async function onSwapMission(i) {
+  if (swapping || !L.canSwap(S, i)) return;
+  swapping = true;
+  try {
+    if (!L.swapIsFree(S)) {
+      if (!rewardsOpen()) { ui.toast('More swaps need a bonus ad, and none is available right now.', 3500); return; }
+      const res = await getReward();
+      if (res !== 'rewarded') { ui.toast(res === 'closed' ? 'The ad was closed before it finished, so no swap.' : 'No ad available right now. Try again in a moment.', 3500); return; }
+    }
+    if (!L.swapMission(S, i)) return;
+    ui.toast('Mission swapped.');
+    sounds.install();
+    refresh(); save();
+  } finally { swapping = false; }
 }
 
 function onClaimChest() {
@@ -300,6 +323,7 @@ async function syncPurchases(manual) {
 }
 
 function onToggleSound() { S.sound = !S.sound; refresh(); save(); }
+function onToggleHaptics() { S.haptics = !S.haptics; refresh(); save(); if (S.haptics) native.impact(true); } // a buzz confirms it is on
 
 /* Background music plays only while the app is on screen and Music is on. */
 function syncMusic() { if (S.music && !paused) startMusic(); else stopMusic(); }
@@ -364,7 +388,7 @@ async function boot() {
 
   ui = createUI({
     getState: () => S,
-    onBuy, onBuyUp, onClaimMission, onClaimChest, onClaimSupply, onClaimAch, onRelocate, onWipe, onToggleSound, onToggleMusic,
+    onBuy, onBuyUp, onClaimMission, onSwapMission, rewardsOpen, onClaimChest, onClaimSupply, onClaimAch, onRelocate, onWipe, onToggleSound, onToggleHaptics, onToggleMusic,
     onOpenJournal: () => { S.journalSeen = L.journalCount(S); save(); refresh(); },
     onToggleNotify: native.isNative() ? onToggleNotify : null,
     onRefresh: refresh,
@@ -379,6 +403,7 @@ async function boot() {
   const cv = $('cv');
   scene = createScene(cv, {
     reduced: REDUCED,
+    flyerRate: () => L.flyerRate(new Date()),
     frenzyOn: () => L.frenzyOn(S, Date.now()),
     fleet: () => S.owned,
     belt: () => S.runs,
@@ -404,7 +429,7 @@ async function boot() {
   scene.resize();
 
   native.watchLifecycle(onHide, onShow);
-  native.watchBackButton(ui.activeTab, () => { ui.selectTab('fleet'); refresh(); }, ui.closeJournal);
+  native.watchBackButton(ui.activeTab, () => { ui.selectTab('fleet'); refresh(); }, ui.closeOverlay);
   native.setupChrome();
 
   const now = Date.now();
@@ -413,6 +438,8 @@ async function boot() {
   if (away > 60) offline(away);
   L.ensureDaily(S, new Date(now));
   if (L.canSupply(S, new Date(now))) ui.toast('Your daily supply drop is ready on the Goals tab.', 4500);
+  const evNow = L.activeEvent(new Date(now));
+  if (evNow) ui.toast('Event: ' + evNow.name + '. ' + evNow.desc, 5000);
   refresh();
 
   // Store first (it can restore "Remove ads" on a new phone), then ads. None of this blocks play; failure just hides the buttons.
