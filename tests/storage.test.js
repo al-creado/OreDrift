@@ -90,6 +90,23 @@ describe('parseSave', () => {
     expect(parse({ ...g, daily: { ...g.daily, swaps: -3 } }).daily.swaps).toBe(0);
   });
 
+  it('keeps valid weekly missions and drops broken ones', () => {
+    const wk = { week: '2026-11-02', missions: [
+      { type: 'tap', target: 2800, progress: 50, claimed: false },
+      { type: 'daily', target: 12, progress: 99, claimed: true },
+      { type: 'comet', target: 15, progress: 3, claimed: 'yes' }] };
+    const S = parse({ ...goodSave(), weekly: wk });
+    expect(S.weekly.week).toBe('2026-11-02');
+    expect(S.weekly.missions[1]).toEqual({ type: 'daily', target: 12, progress: 12, claimed: true });   // progress clamped
+    expect(S.weekly.missions[2].claimed).toBe(false);
+    expect(parse(serializeState(S, NOW)).weekly).toEqual(S.weekly);
+    expect(parse(goodSave()).weekly).toBeNull();                                                          // an older save has none
+    expect(parse({ ...goodSave(), weekly: { ...wk, missions: wk.missions.slice(0, 2) } }).weekly).toBeNull();
+    expect(parse({ ...goodSave(), weekly: { ...wk, missions: [wk.missions[0], wk.missions[1], { type: 'warp', target: 5 }] } }).weekly).toBeNull();
+    expect(parse({ ...goodSave(), weekly: { ...wk, week: 'monday' } }).weekly).toBeNull();
+    expect(parse({ ...goodSave(), weekly: 'x' }).weekly).toBeNull();
+  });
+
   it('wrong container types are ignored, not fatal', () => {
     const S = parse({ ...goodSave(), owned: [1, 2], ups: 'x', ach: 5, stats: null, daily: 'x' });
     expect(S.owned).toEqual({});

@@ -5,7 +5,7 @@
 import { Capacitor } from '@capacitor/core';
 import { Preferences } from '@capacitor/preferences';
 import { GENS, UPS, ACHS, MISSION_TYPES, GRANTED_KEEP, JOURNAL } from './data.js';
-import { fresh } from './logic.js';
+import { fresh, WEEKLY_TYPES } from './logic.js';
 
 export const SAVE_KEY = 'oredrift.v1';
 const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -77,6 +77,16 @@ export function parseSave(raw, now = Date.now()) {
       chest: D.chest === true,
       swaps: int(D.swaps, 0),
       missions: D.missions.map((m) => ({
+        type: m.type, target: m.target, progress: Math.min(m.target, num(m.progress, 0)), claimed: m.claimed === true,
+      })),
+    };
+  }
+  const W = d.weekly;
+  if (isObj(W) && typeof W.week === 'string' && DAY_RE.test(W.week) && Array.isArray(W.missions) && W.missions.length === 3 &&
+      W.missions.every((m) => isObj(m) && WEEKLY_TYPES.includes(m.type) && Number.isFinite(m.target) && m.target > 0)) {
+    S.weekly = {
+      week: W.week,
+      missions: W.missions.map((m) => ({
         type: m.type, target: m.target, progress: Math.min(m.target, num(m.progress, 0)), claimed: m.claimed === true,
       })),
     };

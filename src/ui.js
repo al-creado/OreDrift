@@ -275,7 +275,7 @@ export function createUI(h) {
   }
 
   /* ---------- goals ---------- */
-  const G = { dots: [], m: [], cache: [] }, achEls = [];
+  const G = { dots: [], m: [], w: [], cache: [] }, achEls = [];
   let achKey = '', achView = 'type'; // view: next (closest to done), type (grouped), done (earned)
   let goalsFocus = null; // { chain } or { any: true }: scroll to a commendation reward the next time the Goals tab draws
   const freshAch = new Set(); // earned this session; shown with a NEW pill until the Goals tab is left
@@ -296,6 +296,17 @@ export function createUI(h) {
         if (el.hidden) $('cache-btn').focus(); // the claimed card is gone; keep keyboard focus on the page
       });
       host.appendChild(el); G.m.push(c);
+    }
+    const wh = $('weeklies'); wh.textContent = ''; G.w = [];
+    for (let i = 0; i < 3; i++) {
+      const el = document.createElement('article'); el.className = 'card up';
+      el.innerHTML = '<div class="info"><p class="mtext"></p><div class="track"><div class="fill"></div></div><p class="meta"></p></div><button class="buy" type="button"><span class="bn"></span><span class="bc"></span></button>';
+      const c = { el, text: el.querySelector('.mtext'), fill: el.querySelector('.fill'), meta: el.querySelector('.meta'), btn: el.querySelector('.buy'), bn: el.querySelector('.bn'), bc: el.querySelector('.bc') };
+      c.btn.addEventListener('click', () => {
+        h.onClaimWeekly(i);
+        if (el.hidden) { const sect = $('weekly-sect'); sect.tabIndex = -1; sect.focus({ preventScroll: true }); } // the claimed card is gone; keep keyboard focus on the page
+      });
+      wh.appendChild(el); G.w.push(c);
     }
     const cd = $('cache-dots'); cd.textContent = ''; G.cache = [];
     for (let i = 0; i < 3; i++) {
@@ -442,6 +453,23 @@ export function createUI(h) {
       if (done) setBtn(c, true, 'Claim', '+' + L.fmt(rew));
       else setBtn(c, false, Math.floor(100 * m.progress / m.target) + '%', '');
     });
+    const W = s.weekly;
+    if (W) {
+      const wrew = L.weeklyReward(s), wLeft = Math.max(0, L.weekEndsAt(date) - date.getTime());
+      setText($('wreset'), leftText(wLeft) + ' left');
+      W.missions.forEach((m, i) => {
+        const c = G.w[i], done = m.progress >= m.target;
+        c.el.hidden = m.claimed;
+        setText(c.text, L.missionText(m)); setFill(c.fill, 100 * m.progress / m.target);
+        setText(c.meta, L.fmt(m.progress) + ' / ' + L.fmt(m.target) + '\nReward about ' + L.fmt(wrew) + ' t');
+        if (done) setBtn(c, true, 'Claim', '+' + L.fmt(wrew));
+        else setBtn(c, false, Math.floor(100 * m.progress / m.target) + '%', '');
+      });
+      const wAll = W.missions.every((m) => m.claimed);
+      $('wdone').hidden = !wAll;
+      if (wAll) setText($('wdone'), 'All done for this week. New missions arrive on Monday.');
+    }
+    $('weekly-sect').hidden = !W;
     const got = D.missions.filter((m) => m.claimed).length, all = got === 3, cr = L.chestReward(s);
     const md = $('mdone'); md.hidden = !all;
     if (all) setText(md, 'All done for today. New missions arrive at midnight.');

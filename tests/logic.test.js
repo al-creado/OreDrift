@@ -1131,6 +1131,96 @@ describe('late-game upgrades', () => {
   });
 });
 
+describe('weekly missions', () => {
+  const D = (y, m, d) => new Date(y, m - 1, d, 12);   // 2026-11-02 is a Monday
+  const weekly = (allTime = 1e6) => { const S = L.fresh(0); S.allTime = allTime; L.ensureDaily(S, D(2026, 11, 4)); L.ensureWeekly(S, D(2026, 11, 4)); return S; };
+  it('a week runs Monday to Sunday and ends at the next Monday midnight', () => {
+    for (const day of [2, 3, 4, 5, 6, 7, 8]) {
+      expect(L.weekKey(D(2026, 11, day)), 'Nov ' + day).toBe('2026-11-02');
+      expect(L.weekEndsAt(D(2026, 11, day)), 'Nov ' + day).toBe(new Date(2026, 10, 9).getTime());
+    }
+    expect(L.weekKey(D(2026, 11, 9))).toBe('2026-11-09');
+    expect(L.weekKey(D(2026, 11, 1))).toBe('2026-10-26');   // Sunday belongs to the week before
+  });
+  it('makes three different missions, the same ones for the same week', () => {
+    const a = L.makeWeekly('2026-11-02', 1e6), b = L.makeWeekly('2026-11-02', 1e6);
+    expect(a).toEqual(b);
+    expect(a).toHaveLength(3);
+    expect(new Set(a.map((m) => m.type)).size).toBe(3);
+    expect(a.every((m) => L.WEEKLY_TYPES.includes(m.type) && m.target > 0 && m.progress === 0 && !m.claimed)).toBe(true);
+    expect(L.makeWeekly('2026-11-09', 1e6)).not.toEqual(a);
+  });
+  it('goals are bigger than the daily ones', () => {
+    const targets = {};
+    for (let w = 0; w < 40; w++) for (const m of L.makeWeekly('2026-' + String(1 + (w % 12)).padStart(2, '0') + '-' + String(1 + w % 27).padStart(2, '0'), 1e6)) targets[m.type] = Math.min(targets[m.type] || Infinity, m.target);
+    expect(targets.tap).toBeGreaterThanOrEqual(1050);   // 7 x the smallest daily tap goal
+    expect(targets.buy).toBeGreaterThanOrEqual(60);
+    expect(targets.comet).toBeGreaterThanOrEqual(12);
+    expect(targets.daily).toBeGreaterThanOrEqual(10);
+    expect(targets.mine).toBeGreaterThanOrEqual(30000);
+  });
+  it('a new week replaces the missions; the same week keeps them', () => {
+    const S = weekly();
+    S.weekly.missions[0].progress = 1;
+    expect(L.ensureWeekly(S, D(2026, 11, 8))).toBe(false);     // still the same week (Sunday)
+    expect(S.weekly.missions[0].progress).toBe(1);
+    expect(L.ensureWeekly(S, D(2026, 11, 9))).toBe(true);      // Monday
+    expect(S.weekly.week).toBe('2026-11-09');
+    expect(S.weekly.missions.every((m) => m.progress === 0)).toBe(true);
+  });
+  it('progress counts toward daily and weekly missions together', () => {
+    const S = weekly();
+    S.daily.missions = [{ type: 'tap', target: 100, progress: 0, claimed: false }, { type: 'mine', target: 100, progress: 0, claimed: false }, { type: 'buy', target: 100, progress: 0, claimed: false }];
+    S.weekly.missions = [{ type: 'tap', target: 1000, progress: 0, claimed: false }, { type: 'comet', target: 12, progress: 0, claimed: false }, { type: 'buy', target: 60, progress: 0, claimed: false }];
+    L.tap(S, NOW);
+    expect(S.daily.missions[0].progress).toBe(1);
+    expect(S.weekly.missions[0].progress).toBe(1);
+    L.addProg(S, 'comet', 2);
+    expect(S.weekly.missions[1].progress).toBe(2);
+    L.addProg(S, 'buy', 5);
+    expect(S.daily.missions[2].progress).toBe(5); expect(S.weekly.missions[2].progress).toBe(5);
+    S.weekly.missions[0].claimed = true;
+    L.addProg(S, 'tap', 5);
+    expect(S.weekly.missions[0].progress).toBe(1);   // claimed ones stop counting
+  });
+  it('claiming a daily mission counts toward a weekly "daily missions" goal', () => {
+    const S = weekly();
+    S.daily.missions[0] = { type: 'tap', target: 5, progress: 5, claimed: false };
+    S.weekly.missions[0] = { type: 'daily', target: 10, progress: 0, claimed: false };
+    expect(L.claimMission(S, 0)).toBeGreaterThan(0);
+    expect(S.weekly.missions[0].progress).toBe(1);
+  });
+  it('claims once, pays about an hour of output, and does not count as a daily mission', () => {
+    const S = weekly(); S.owned = { laser: 10 };       // 20 t/s
+    S.weekly.missions[1] = { type: 'tap', target: 10, progress: 10, claimed: false };
+    expect(L.weeklyReward(S)).toBe(20 * 3600);
+    const missionsBefore = S.stats.missions, oreBefore = S.ore;
+    expect(L.claimWeekly(S, 1)).toBe(20 * 3600);
+    expect(S.ore).toBe(oreBefore + 20 * 3600);
+    expect(S.stats.missions).toBe(missionsBefore);     // the "Complete N daily missions" commendations are for daily ones
+    expect(L.claimWeekly(S, 1)).toBe(0);               // already claimed
+    S.weekly.missions[0].progress = 0;
+    expect(L.claimWeekly(S, 0)).toBe(0);               // not finished
+    expect(L.claimWeekly(S, 9)).toBe(0);
+    expect(L.claimWeekly(L.fresh(0), 0)).toBe(0);      // no weekly set yet
+  });
+  it('the reward has a floor for a new player', () => {
+    expect(L.weeklyReward(L.fresh(0))).toBe(5000);
+  });
+  it('a finished weekly mission lights up Goals', () => {
+    const S = weekly(), d = D(2026, 11, 4);
+    S.lastSupply = L.dayKey(d); S.daily.chest = true;
+    expect(L.goalsReady(S, d)).toBe(false);
+    S.weekly.missions[2].progress = S.weekly.missions[2].target;
+    expect(L.goalsReady(S, d)).toBe(true);
+    S.weekly.missions[2].claimed = true;
+    expect(L.goalsReady(S, d)).toBe(false);
+  });
+  it('describes the daily-missions goal', () => {
+    expect(L.missionText({ type: 'daily', target: 12 })).toBe('Complete 12 daily missions');
+  });
+});
+
 describe('swapping a daily mission', () => {
   const daily = (extra = {}) => {
     const S = L.fresh(0); S.allTime = 1e6;
@@ -1430,7 +1520,7 @@ describe('save-shape defaults', () => {
   it('fresh state has the documented fields', () => {
     const S = L.fresh(42);
     expect(Object.keys(S).sort()).toEqual(['ach', 'allTime', 'daily', 'frenzyUntil', 'gifts', 'haptics', 'last', 'lastSupply', 'owned',
-      'granted', 'iap', 'journalSeen', 'music', 'notify', 'podReadyAt', 'points', 'ore', 'runs', 'sound', 'stats', 'streak', 'taps', 'total', 'ups'].sort());
+      'granted', 'iap', 'journalSeen', 'music', 'notify', 'podReadyAt', 'points', 'ore', 'runs', 'sound', 'stats', 'streak', 'taps', 'total', 'ups', 'weekly'].sort());
     expect(S.last).toBe(42);
     expect(S.sound).toBe(true);
   });

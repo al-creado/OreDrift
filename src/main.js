@@ -90,8 +90,9 @@ function tick(now) {
 
 /* ---------- housekeeping: new day, new commendations ---------- */
 function housekeeping(now) {
-  const had = !!S.daily;
+  const had = !!S.daily, hadWeekly = !!S.weekly;
   if (L.ensureDaily(S, new Date(now)) && had) ui.toast('New daily missions are ready.');
+  if (L.ensureWeekly(S, new Date(now)) && hadWeekly) ui.toast('New weekly missions are ready.');
   const earned = L.checkAch(S);
   if (earned.length) announceAch(earned);
   // A new chapter of the Captain's journal may have unlocked.
@@ -233,6 +234,14 @@ async function onSwapMission(i) {
     sounds.install();
     refresh(); save();
   } finally { swapping = false; }
+}
+
+function onClaimWeekly(i) {
+  const g = L.claimWeekly(S, i);
+  if (!g) return;
+  ui.toast('Weekly mission complete. +' + L.fmt(g) + ' t.');
+  sounds.claim();
+  refresh(); save();
 }
 
 function onClaimChest() {
@@ -388,7 +397,7 @@ async function boot() {
 
   ui = createUI({
     getState: () => S,
-    onBuy, onBuyUp, onClaimMission, onSwapMission, rewardsOpen, onClaimChest, onClaimSupply, onClaimAch, onRelocate, onWipe, onToggleSound, onToggleHaptics, onToggleMusic,
+    onBuy, onBuyUp, onClaimMission, onClaimWeekly, onSwapMission, rewardsOpen, onClaimChest, onClaimSupply, onClaimAch, onRelocate, onWipe, onToggleSound, onToggleHaptics, onToggleMusic,
     onOpenJournal: () => { S.journalSeen = L.journalCount(S); save(); refresh(); },
     onToggleNotify: native.isNative() ? onToggleNotify : null,
     onRefresh: refresh,

@@ -61,7 +61,7 @@ export function fresh(now = 0) {
     ore: 0, total: 0, allTime: 0, taps: 0, points: 0, runs: 0,
     owned: {}, ups: {}, last: now, sound: true, music: true, haptics: true, ach: {},
     stats: { comets: 0, missions: 0, best: 0, ships: 0, drops: 0, chests: 0, capped: 0, night: 0, bare: 0, bestRun: 0, overdrive: 0, played: 0, peak: 0 },
-    streak: 0, lastSupply: '', daily: null, frenzyUntil: 0, notify: false, podReadyAt: 0,
+    streak: 0, lastSupply: '', daily: null, weekly: null, frenzyUntil: 0, notify: false, podReadyAt: 0,
     iap: { removeAds: false, starter: false, boost: false }, granted: [], journalSeen: 0,
     gifts: {}, // commendation id -> ore gift waiting to be claimed
   };
@@ -418,17 +418,66 @@ export function ensureDaily(S, date) {
   return false;
 }
 
+/** Adds progress to every unclaimed mission of this type, daily and weekly. */
 export function addProg(S, type, n) {
-  if (!S.daily) return;
-  for (const m of S.daily.missions) {
-    if (m.type === type && !m.claimed && m.progress < m.target) m.progress = Math.min(m.target, m.progress + n);
+  for (const set of [S.daily, S.weekly]) {
+    if (!set) continue;
+    for (const m of set.missions) {
+      if (m.type === type && !m.claimed && m.progress < m.target) m.progress = Math.min(m.target, m.progress + n);
+    }
   }
+}
+
+/* ---------- weekly missions: bigger goals and rewards, a new set every Monday ---------- */
+/** 'daily' counts daily missions claimed during the week. */
+export const WEEKLY_TYPES = ['tap', 'mine', 'comet', 'buy', 'daily'];
+/** The Monday (local) that starts the week containing this date, as a day key. */
+export const weekKey = (date) => dayKey(new Date(date.getFullYear(), date.getMonth(), date.getDate() - ((date.getDay() + 6) % 7)));
+/** When the week ends: the next Monday at local midnight, in ms. */
+export const weekEndsAt = (date) => new Date(date.getFullYear(), date.getMonth(), date.getDate() + 7 - ((date.getDay() + 6) % 7)).getTime();
+
+function weeklyTarget(type, allTime, r) {
+  if (type === 'tap') return TAP_TARGETS[Math.floor(r() * 3)] * 7;
+  if (type === 'mine') return niceRound(Math.max(30000, allTime * 0.25));
+  if (type === 'buy') return 60 + Math.floor(r() * 41);
+  if (type === 'comet') return 12 + Math.floor(r() * 9);
+  return 10 + Math.floor(r() * 5); // daily missions claimed
+}
+/** Same week and same lifetime ore always give the same three missions, all of different types. */
+export function makeWeekly(week, allTime) {
+  const r = rng(hashStr('w' + week)), types = WEEKLY_TYPES.slice();
+  for (let i = types.length - 1; i > 0; i--) {
+    const j = Math.floor(r() * (i + 1));
+    const x = types[i]; types[i] = types[j]; types[j] = x;
+  }
+  return types.slice(0, 3).map((type) => ({ type, target: weeklyTarget(type, allTime, r), progress: 0, claimed: false }));
+}
+/** Regenerates the weekly missions when a new week has started. Mutates S. Returns true when it did. */
+export function ensureWeekly(S, date) {
+  const w = weekKey(date);
+  if (!S.weekly || S.weekly.week !== w) {
+    S.weekly = { week: w, missions: makeWeekly(w, S.allTime) };
+    return true;
+  }
+  return false;
+}
+/** An hour of current output, at least 5,000 t: about eight times a daily mission. */
+export const weeklyReward = (S) => minutesOfOre(S, 60, 5000);
+/** Mutates S. Returns the reward, or 0 if not claimable. */
+export function claimWeekly(S, i) {
+  const m = S.weekly && S.weekly.missions[i];
+  if (!m || m.claimed || m.progress < m.target) return 0;
+  const g = weeklyReward(S);
+  m.claimed = true;
+  gain(S, g, true);
+  return g;
 }
 
 export function missionText(m) {
   if (m.type === 'tap') return 'Tap the asteroid ' + fmt(m.target) + ' times';
   if (m.type === 'mine') return 'Mine ' + fmt(m.target) + ' t of ore';
   if (m.type === 'buy') return 'Hire ' + m.target + ' vessels';
+  if (m.type === 'daily') return 'Complete ' + m.target + ' daily missions';
   return 'Catch ' + m.target + ' comets or supply ships';
 }
 
@@ -453,6 +502,7 @@ export function goalsReady(S, date) {
   const D = S.daily;
   if (!D) return false;
   if (D.missions.some((m) => !m.claimed && m.progress >= m.target)) return true;
+  if (S.weekly && S.weekly.missions.some((m) => !m.claimed && m.progress >= m.target)) return true;
   return !D.chest && D.missions.every((m) => m.claimed);
 }
 
@@ -463,6 +513,7 @@ export function claimMission(S, i) {
   const g = missionReward(S);
   m.claimed = true; S.stats.missions++;
   gain(S, g, true);
+  addProg(S, 'daily', 1); // counts toward a weekly mission
   return g;
 }
 
