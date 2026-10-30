@@ -10,15 +10,15 @@ const D = (y, m, d) => new Date(y, m - 1, d, 12);
 const state = (patch = {}) => Object.assign(L.fresh(NOW), patch);
 
 describe('data', () => {
-  it('has 7 vessels, 38 upgrades and 69 commendations with unique ids', () => {
+  it('has 7 vessels, 15 upgrades and 71 commendations with unique ids', () => {
     expect(GENS).toHaveLength(7);
-    expect(UPS).toHaveLength(38);
-    expect(new Set(UPS.map((x) => x.id)).size).toBe(38);
-    const full = ACHS.find((a) => a.id === 'u2');
-    expect(full.t).toBe(UPS.length);                    // Fully Fitted always asks for every upgrade
-    expect(full.desc).toContain(String(UPS.length));
-    expect(ACHS).toHaveLength(69);
-    expect(new Set(ACHS.map((a) => a.id)).size).toBe(69);
+    expect(UPS).toHaveLength(15);
+    expect(new Set(UPS.map((x) => x.id)).size).toBe(15);
+    const tiers = ['u1', 'u2', 'u3', 'u4'].map((id) => ACHS.find((a) => a.id === id));
+    expect(tiers.map((a) => a.t)).toEqual([3, 6, 10, UPS.length]);   // spread across the list; the last always asks for every upgrade
+    expect(tiers[3].desc).toContain(String(UPS.length));
+    expect(ACHS).toHaveLength(71);
+    expect(new Set(ACHS.map((a) => a.id)).size).toBe(71);
   });
 });
 
@@ -694,7 +694,7 @@ describe('daily missions', () => {
 describe('commendations', () => {
   const ORIGINAL = {
     t1: 100, t2: 1000, t3: 10000, t4: 100000, o1: 1000, o2: 1e6, o3: 1e9, o4: 1e12,
-    f1: 10, f2: 50, f3: 150, f4: 400, k1: 3, k2: 5, k3: 7, u1: 3, u2: UPS.length, /* every upgrade, so it follows the list */
+    f1: 10, f2: 50, f3: 150, f4: 400, k1: 3, k2: 5, k3: 7, u1: 3, u2: 6,
     r1: 1, r2: 5, r3: 10, c1: 1, c2: 25, c3: 100, m1: 3, m2: 30, m3: 100,
     s1: 3, s2: 7, s3: 30, p1: 100, p2: 10000, p3: 1e6,
   };
@@ -735,7 +735,7 @@ describe('commendations', () => {
       expect(L.achBonus(a)).toBe(0.01);
       expect(a.secret).toBeUndefined();
     }
-    expect(NEW_IDS).toHaveLength(37);
+    expect(NEW_IDS).toHaveLength(39);
   });
 
   it('every commendation has a known group and a tier, and the new ones give +0.5%', () => {
@@ -752,8 +752,8 @@ describe('commendations', () => {
   describe('chains (one tile for Bronze, Silver, Gold...)', () => {
     it('puts every commendation in exactly one chain, giving 26 tiles', () => {
       const ids = L.CHAINS.flatMap((c) => c.steps.map((a) => a.id));
-      expect(ids).toHaveLength(69);
-      expect(new Set(ids).size).toBe(69);
+      expect(ids).toHaveLength(71);
+      expect(new Set(ids).size).toBe(71);
       expect(L.CHAINS).toHaveLength(26);
       expect(new Set(L.CHAINS.map((c) => c.id)).size).toBe(26);
       for (const a of ACHS) expect(a.chain, a.id).toBeTruthy();
@@ -908,10 +908,10 @@ describe('commendations', () => {
       expect(L.achBonusTotal(S)).toBeCloseTo(0.02, 12);
       expect(L.ops(S)).toBeCloseTo(20 * 1.02, 9);
     });
-    it('earning all 69 adds 32% + 18.5%', () => {
+    it('earning all 71 adds 32% + 19.5%', () => {
       const S = state();
       S.ach = Object.fromEntries(ACHS.map((a) => [a.id, true]));
-      expect(L.achBonusTotal(S)).toBeCloseTo(0.32 + 0.185, 9);
+      expect(L.achBonusTotal(S)).toBeCloseTo(0.32 + 0.195, 9);
     });
   });
 
@@ -1095,58 +1095,39 @@ describe("the Captain's journal", () => {
 });
 
 describe('late-game upgrades', () => {
-  const vessel = (id, tier) => UPS.find((x) => x.id === tier + '_' + id);
-  it('every vessel has three tiers, each costing more and needing more than the last', () => {
-    for (const g of GENS) {
-      const [a, b, c] = ['oc', 'oh', 'mw'].map((t) => vessel(g.id, t));
-      expect([a, b, c].every(Boolean), g.id).toBe(true);
-      expect(a.cost < b.cost && b.cost < c.cost, g.id).toBe(true);
-      expect(a.need < b.need && b.need < c.need, g.id).toBe(true);
-      expect([a.mult, b.mult, c.mult]).toEqual([2, 3, 5]);
-      expect(a.cost).toBe(g.base * 1e4);
-    }
+  it('has 15 upgrades: the original nine, then six boosts that start where those end', () => {
+    expect(UPS.slice(0, 9).map((x) => x.id)).toEqual(['bits', 'tune1', 'uplink', 'plasma', 'tune2', 'hammer', 'uplink2', 'tune3', 'pulse']);
+    const late = UPS.slice(9);
+    expect(late.map((x) => x.id)).toEqual(['tune4', 'uplink3', 'tune5', 'singular', 'tune6', 'tune7']);
+    expect(late.every((x) => x.cost > UPS[8].cost)).toBe(true);
+    const costs = late.map((x) => x.cost);
+    expect(costs).toEqual([...costs].sort((a, b) => a - b));
   });
-  it('a vessel upgrade multiplies only that vessel', () => {
-    const S = state({ owned: { drone: 50, laser: 50 } });
-    const before = L.ops(S);
-    S.ups.oc_drone = true;
-    const drones = 50 * 0.1 * L.milestoneMult(50), lasers = 50 * 1 * L.milestoneMult(50);
-    expect(L.ops(S)).toBeCloseTo(before + drones, 9);   // drones doubled, lasers untouched
-    expect(L.vesselMult(S, 'drone')).toBe(2);
-    expect(L.vesselMult(S, 'laser')).toBe(1);
-    S.ups.oh_drone = true; S.ups.mw_drone = true;
-    expect(L.vesselMult(S, 'drone')).toBe(30);
-    expect(L.ops(S)).toBeCloseTo(drones * 30 + lasers, 9);
-  });
-  it('a vessel upgrade is listed only once you own enough of that vessel and have mined 30% of its cost', () => {
-    const tier = vessel('drone', 'oc');
-    const rich = state({ total: tier.cost, owned: { drone: 49 } });
-    expect(L.visibleUps(rich).map((x) => x.id)).not.toContain('oc_drone');
-    rich.owned.drone = 50;
-    expect(L.visibleUps(rich).map((x) => x.id)).toContain('oc_drone');
-    const poor = state({ total: tier.cost * 0.29, owned: { drone: 50 } });
-    expect(L.visibleUps(poor).map((x) => x.id)).not.toContain('oc_drone');
+  it('the new boosts do what they say', () => {
+    expect(L.tapValue(state({ ups: { uplink3: true } }), NOW, 1000)).toBeCloseTo(1 + 250, 9);
+    expect(L.tapValue(state({ ups: { singular: true } }), NOW, 0)).toBeCloseTo(10, 9);
+    expect(L.prodMult(state({ ups: { tune4: true, tune5: true } }))).toBeCloseTo(5, 9);
+    expect(L.prodMult(state({ ups: { tune6: true, tune7: true } }))).toBeCloseTo(12, 9);
   });
   it('the list is sorted by cost, cheapest first', () => {
-    const S = state({ total: 1e12, owned: { drone: 200, laser: 200 } });
+    const S = state({ total: 1e13 });
     const costs = L.visibleUps(S).map((x) => x.cost);
     expect(costs.length).toBeGreaterThan(5);
     expect(costs).toEqual([...costs].sort((a, b) => a - b));
   });
-  it('the next upgrade is the cheapest one not listed yet, with what unlocks it', () => {
-    const S = state({ total: 0 });
-    expect(L.nextUpgrade(S)).toMatchObject({ up: { id: 'bits' }, ore: 30 });
-    const own = state({ total: 1e15, owned: { drone: 10 } });
-    const n = L.nextUpgrade(own);
-    expect(n.vessel).toBe('drone');                 // plenty of ore, but too few drones
-    expect(n.own).toBe(50);
-    expect(L.nextUpgrade(state({ total: 1e30, owned: Object.fromEntries(GENS.map((g) => [g.id, 200])) }))).toBeNull();
+  it('the next upgrade is the cheapest one not listed yet, with the ore that reveals it', () => {
+    expect(L.nextUpgrade(state({ total: 0 }))).toMatchObject({ up: { id: 'bits' }, ore: 30 });
+    expect(L.nextUpgrade(state({ total: 3e9 })).up.id).toBe('tune4');
+    expect(L.nextUpgrade(state({ total: 1e30 }))).toBeNull();
   });
-  it('the global late-game boosts follow the original nine', () => {
-    const last = UPS[8].cost;
-    for (const id of ['quark', 'tune4', 'uplink3', 'tune5', 'singular', 'uplink4', 'tune6', 'tune7']) expect(u(id).cost, id).toBeGreaterThan(last);
-    expect(L.tapValue(state({ ups: { uplink3: true } }), NOW, 1000)).toBeCloseTo(1 + 250, 9);
-    expect(L.prodMult(state({ ups: { tune4: true, tune5: true } }))).toBeCloseTo(5, 9);
+  it('the Upgrades commendations are spread across the list', () => {
+    const S = state();
+    for (const [n, id] of [[3, 'u1'], [6, 'u2'], [10, 'u3'], [UPS.length, 'u4']]) {
+      S.ups = Object.fromEntries(UPS.slice(0, n - 1).map((x) => [x.id, true]));
+      L.checkAch(S); expect(!!S.ach[id], id + ' one short').toBe(false);
+      S.ups = Object.fromEntries(UPS.slice(0, n).map((x) => [x.id, true]));
+      L.checkAch(S); expect(S.ach[id], id).toBe(true);
+    }
   });
 });
 
