@@ -535,9 +535,11 @@ export function createUI(h) {
     if (activeTab === 'goals' && name !== 'goals') { freshAch.clear(); achKey = ''; } // seen now
     if (name === 'goals') achKey = ''; // rebuild so "Next up" is current
     if (name === 'goals' && activeTab !== 'goals') goalsFocus = goalsFocus || { any: true }; // coming from another tab: look for waiting rewards
+    const switching = name !== activeTab;
     activeTab = name;
     document.querySelectorAll('.nav button').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tab === name)));
     TABS.forEach((t) => { $('tab-' + t).hidden = t !== name; });
+    if (switching && name !== 'fleet') $('tab-' + name).scrollTop = 0; // Fleet keeps its place; the others start at the top (Goals then jumps to a waiting reward)
   }
   function confirmable(btn, label, armedLabel, action) {
     let armed = false, timer = 0;
