@@ -10,9 +10,10 @@ const D = (y, m, d) => new Date(y, m - 1, d, 12);
 const state = (patch = {}) => Object.assign(L.fresh(NOW), patch);
 
 describe('data', () => {
-  it('has 7 vessels, 9 upgrades and 69 commendations with unique ids', () => {
+  it('has 7 vessels, 38 upgrades and 69 commendations with unique ids', () => {
     expect(GENS).toHaveLength(7);
-    expect(UPS).toHaveLength(9);
+    expect(UPS).toHaveLength(38);
+    expect(new Set(UPS.map((x) => x.id)).size).toBe(38);
     expect(ACHS).toHaveLength(69);
     expect(new Set(ACHS.map((a) => a.id)).size).toBe(69);
   });
@@ -186,7 +187,7 @@ describe('output and tap formulas', () => {
   });
 
   it('with every upgrade, survey points and commendations', () => {
-    const S = state({ points: 2, ups: Object.fromEntries(UPS.map((x) => [x.id, true])), owned: { drone: 10 } });
+    const S = state({ points: 2, ups: Object.fromEntries(UPS.slice(0, 9).map((x) => [x.id, true])), owned: { drone: 10 } }); // the original nine
     S.ach = { t1: true, t2: true };
     const o = L.ops(S);
     // output: 10*0.1*2 = 2, tunes 1.25*1.5*2 = 3.75, survey 1.2, ach 1.02
@@ -1087,6 +1088,62 @@ describe("the Captain's journal", () => {
 
   it('every chapter that needs something says what', () => {
     for (const c of JOURNAL.slice(1)) expect(c.req.length, c.id).toBeGreaterThan(0);
+  });
+});
+
+describe('late-game upgrades', () => {
+  const vessel = (id, tier) => UPS.find((x) => x.id === tier + '_' + id);
+  it('every vessel has three tiers, each costing more and needing more than the last', () => {
+    for (const g of GENS) {
+      const [a, b, c] = ['oc', 'oh', 'mw'].map((t) => vessel(g.id, t));
+      expect([a, b, c].every(Boolean), g.id).toBe(true);
+      expect(a.cost < b.cost && b.cost < c.cost, g.id).toBe(true);
+      expect(a.need < b.need && b.need < c.need, g.id).toBe(true);
+      expect([a.mult, b.mult, c.mult]).toEqual([2, 3, 5]);
+      expect(a.cost).toBe(g.base * 1e4);
+    }
+  });
+  it('a vessel upgrade multiplies only that vessel', () => {
+    const S = state({ owned: { drone: 50, laser: 50 } });
+    const before = L.ops(S);
+    S.ups.oc_drone = true;
+    const drones = 50 * 0.1 * L.milestoneMult(50), lasers = 50 * 1 * L.milestoneMult(50);
+    expect(L.ops(S)).toBeCloseTo(before + drones, 9);   // drones doubled, lasers untouched
+    expect(L.vesselMult(S, 'drone')).toBe(2);
+    expect(L.vesselMult(S, 'laser')).toBe(1);
+    S.ups.oh_drone = true; S.ups.mw_drone = true;
+    expect(L.vesselMult(S, 'drone')).toBe(30);
+    expect(L.ops(S)).toBeCloseTo(drones * 30 + lasers, 9);
+  });
+  it('a vessel upgrade is listed only once you own enough of that vessel and have mined 30% of its cost', () => {
+    const tier = vessel('drone', 'oc');
+    const rich = state({ total: tier.cost, owned: { drone: 49 } });
+    expect(L.visibleUps(rich).map((x) => x.id)).not.toContain('oc_drone');
+    rich.owned.drone = 50;
+    expect(L.visibleUps(rich).map((x) => x.id)).toContain('oc_drone');
+    const poor = state({ total: tier.cost * 0.29, owned: { drone: 50 } });
+    expect(L.visibleUps(poor).map((x) => x.id)).not.toContain('oc_drone');
+  });
+  it('the list is sorted by cost, cheapest first', () => {
+    const S = state({ total: 1e12, owned: { drone: 200, laser: 200 } });
+    const costs = L.visibleUps(S).map((x) => x.cost);
+    expect(costs.length).toBeGreaterThan(5);
+    expect(costs).toEqual([...costs].sort((a, b) => a - b));
+  });
+  it('the next upgrade is the cheapest one not listed yet, with what unlocks it', () => {
+    const S = state({ total: 0 });
+    expect(L.nextUpgrade(S)).toMatchObject({ up: { id: 'bits' }, ore: 30 });
+    const own = state({ total: 1e15, owned: { drone: 10 } });
+    const n = L.nextUpgrade(own);
+    expect(n.vessel).toBe('drone');                 // plenty of ore, but too few drones
+    expect(n.own).toBe(50);
+    expect(L.nextUpgrade(state({ total: 1e30, owned: Object.fromEntries(GENS.map((g) => [g.id, 200])) }))).toBeNull();
+  });
+  it('the global late-game boosts follow the original nine', () => {
+    const last = UPS[8].cost;
+    for (const id of ['quark', 'tune4', 'uplink3', 'tune5', 'singular', 'uplink4', 'tune6', 'tune7']) expect(u(id).cost, id).toBeGreaterThan(last);
+    expect(L.tapValue(state({ ups: { uplink3: true } }), NOW, 1000)).toBeCloseTo(1 + 250, 9);
+    expect(L.prodMult(state({ ups: { tune4: true, tune5: true } }))).toBeCloseTo(5, 9);
   });
 });
 

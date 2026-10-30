@@ -161,11 +161,11 @@ export function createUI(h) {
       const c = cards[g.id], n = L.own(s, g.id);
       if (L.revealed(s, g, i)) {
         c.root.hidden = false; c.root.classList.remove('locked'); c.btn.hidden = false;
-        const each = g.rate * L.milestoneMult(n || 1) * pm, next = MILESTONES.find((k) => k > n);
+        const each = g.rate * L.milestoneMult(n || 1) * L.vesselMult(s, g.id) * pm, next = MILESTONES.find((k) => k > n);
         setText(c.count, String(n)); setText(c.name, g.name); setText(c.desc, g.desc);
         setText(c.meta, n > 0
           ? L.fmt(each) + ' t/s each, ' + L.fmt(n * each) + ' t/s total\n' + (next ? 'Output doubles at ' + next + ' owned' : 'All output boosts earned')
-          : L.fmt(g.rate * pm) + ' t/s each\nOutput doubles at ' + MILESTONES[0] + ' owned');
+          : L.fmt(g.rate * L.vesselMult(s, g.id) * pm) + ' t/s each\nOutput doubles at ' + MILESTONES[0] + ' owned');
         const q = L.buyQty(s, g, buyMode), cost = L.bulkCost(s, g, q), can = s.ore >= cost;
         setText(c.bn, 'Buy ×' + q); setText(c.bc, L.fmt(cost));
         c.btn.disabled = !can; c.btn.classList.toggle('can', can);
@@ -180,8 +180,10 @@ export function createUI(h) {
 
   /* ---------- upgrades ---------- */
   let upKey = '', upEls = {};
+  const UPS_SHOWN = 6; // the cheapest few; the rest wait their turn so the list stays easy to scan
   function updateUps(s) {
-    const vis = L.visibleUps(s), installed = L.upCount(s), key = vis.map((u) => u.id).join(',') + '|' + installed;
+    const ready = L.visibleUps(s), vis = ready.slice(0, UPS_SHOWN), waiting = ready.length - vis.length, installed = L.upCount(s), nx = L.nextUpgrade(s);
+    const key = vis.map((u) => u.id).join(',') + '|' + installed + '|' + waiting + '|' + (nx ? nx.up.id + (nx.vessel ? 'o' : 'm') : '');
     const host = $('ups');
     if (key !== upKey) {
       upKey = key; upEls = {}; host.textContent = '';
@@ -204,6 +206,19 @@ export function createUI(h) {
         b.addEventListener('click', () => h.onBuyUp(u));
         el.append(info, b); host.appendChild(el); upEls[u.id] = b;
       });
+      if (waiting) {
+        const w = document.createElement('div'); w.className = 'foot';
+        w.textContent = waiting + ' more ' + (waiting === 1 ? 'upgrade is' : 'upgrades are') + ' ready. They show up as you install these.';
+        host.appendChild(w);
+      }
+      if (nx) { // a hint of what comes next, like the unknown vessel on the Fleet tab
+        const el = document.createElement('article'); el.className = 'card up locked';
+        const info = document.createElement('div'); info.className = 'info';
+        const hd = document.createElement('h3'); hd.className = 'name'; hd.textContent = 'Unknown upgrade';
+        const p = document.createElement('p'); p.className = 'desc';
+        p.textContent = nx.vessel ? 'Own ' + nx.own + ' × ' + GENS.find((g) => g.id === nx.vessel).name + ' to reveal it.' : 'Mine ' + L.fmt(nx.ore) + ' t this run to reveal it.';
+        info.append(hd, p); el.append(info); host.appendChild(el);
+      }
       const f = document.createElement('div'); f.className = 'foot'; f.textContent = installed + ' of ' + UPS.length + ' installed';
       host.appendChild(f);
     }

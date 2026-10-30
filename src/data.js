@@ -31,7 +31,35 @@ export const UPS = [
   { id: 'uplink2', name: 'Swarm Uplink', desc: 'Each tap also mines another 10% of your ore per second.', cost: 5e7, link: 0.1 },
   { id: 'tune3', name: 'Fleet Tuning III', desc: 'All vessels work twice as fast.', cost: 3e8, prod: 2 },
   { id: 'pulse', name: 'Gravity Pulse', desc: 'Every tap mines five times as much.', cost: 5e9, tap: 5 },
+  // Late game: more global boosts. These start where the first nine leave off.
+  { id: 'quark', name: 'Quark Tips', desc: 'Every tap mines five times as much.', cost: 3e11, tap: 5 },
+  { id: 'tune4', name: 'Fleet Tuning IV', desc: 'All vessels work twice as fast.', cost: 2e11, prod: 2 },
+  { id: 'uplink3', name: 'Quantum Uplink', desc: 'Each tap also mines another 25% of your ore per second.', cost: 2e12, link: 0.25 },
+  { id: 'tune5', name: 'Fleet Tuning V', desc: 'All vessels work two and a half times as fast.', cost: 5e13, prod: 2.5 },
+  { id: 'singular', name: 'Singularity Drill', desc: 'Every tap mines ten times as much.', cost: 2e14, tap: 10 },
+  { id: 'uplink4', name: 'Hive Uplink', desc: 'Each tap also mines another 50% of your ore per second.', cost: 4e15, link: 0.5 },
+  { id: 'tune6', name: 'Fleet Tuning VI', desc: 'All vessels work three times as fast.', cost: 1e16, prod: 3 },
+  { id: 'tune7', name: 'Fleet Tuning VII', desc: 'All vessels work four times as fast.', cost: 3e18, prod: 4 },
 ];
+
+/*
+ * Vessel upgrades: three tiers for each vessel kind that multiply only that vessel's output. They appear once you own
+ * enough of the vessel (`need`) and cost a fixed multiple of its first unit's price, so they stay worth buying however far you go.
+ */
+const VESSEL_TIERS = [
+  { key: 'oc', label: 'Overclock', mult: 2, word: 'twice as fast', need: 50, cost: 1e4 },
+  { key: 'oh', label: 'Overhaul', mult: 3, word: 'three times as fast', need: 100, cost: 3e6 },
+  { key: 'mw', label: 'Masterwork', mult: 5, word: 'five times as fast', need: 175, cost: 5e9 },
+];
+const VESSEL_SHORT = { drone: 'Drone', laser: 'Laser', tug: 'Tug', barge: 'Barge', refinery: 'Refinery', foundry: 'Foundry', collector: 'Collector' };
+for (const t of VESSEL_TIERS) {
+  for (const g of GENS) {
+    UPS.push({
+      id: t.key + '_' + g.id, name: VESSEL_SHORT[g.id] + ' ' + t.label, desc: 'Each ' + g.name + ' works ' + t.word + '. Needs ' + t.need + ' owned.',
+      cost: g.base * t.cost, vessel: g.id, mult: t.mult, need: t.need,
+    });
+  }
+}
 
 export const MISSION_TYPES = ['tap', 'mine', 'buy', 'comet'];
 export const TAP_TARGETS = [150, 250, 400];
@@ -94,7 +122,7 @@ export const ACHS = [
   ach('v3', 'Fleet', 3, 'Mass Production', 'Own 200 of one kind of vessel.', 200, 'maxVessel', NEW),
   // Upgrades
   ach('u1', 'Upgrades', 1, 'Tooled Up', 'Install 3 upgrades in one run.', 3, 'upgrades'),
-  ach('u2', 'Upgrades', 2, 'Fully Fitted', 'Install every upgrade in one run.', UPS.length, 'upgrades'),
+  ach('u2', 'Upgrades', 2, 'Fully Fitted', 'Install 9 upgrades in one run.', 9, 'upgrades'),
   // Belts
   ach('r1', 'Belts', 1, 'New Horizons', 'Relocate to a new belt.', 1, 'runs'),
   ach('r2', 'Belts', 2, 'Belt Hopper', 'Relocate 5 times.', 5, 'runs'),

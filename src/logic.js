@@ -85,6 +85,15 @@ export const achMult = (S) => 1 + achBonusTotal(S);
 export const iapMult = (S) => (S.iap && S.iap.boost ? BOOST_MULT : 1);
 export const adsRemoved = (S) => !!(S.iap && S.iap.removeAds);
 
+/** Product of the installed upgrades that boost one vessel kind (see the vessel upgrades in data.js). */
+const VESSEL_UPS = {};
+for (const u of UPS) if (u.vessel) (VESSEL_UPS[u.vessel] = VESSEL_UPS[u.vessel] || []).push(u);
+export function vesselMult(S, id) {
+  let m = 1;
+  for (const u of VESSEL_UPS[id] || []) if (S.ups[u.id]) m *= u.mult;
+  return m;
+}
+
 export function prodMult(S) {
   let m = 1;
   for (const u of UPS) if (S.ups[u.id] && u.prod) m *= u.prod;
@@ -104,7 +113,7 @@ export function ops(S, now) {
   let t = 0;
   for (const g of GENS) {
     const n = own(S, g.id);
-    if (n) t += n * g.rate * milestoneMult(n);
+    if (n) t += n * g.rate * milestoneMult(n) * vesselMult(S, g.id);
   }
   const boost = now != null && frenzyOn(S, now) ? FRENZY_MULT : 1;
   return t * prodMult(S) * boost;
@@ -139,7 +148,16 @@ export function maxBuy(S, g) {
 export const buyQty = (S, g, mode) => (mode === 'max' ? Math.max(1, maxBuy(S, g)) : mode);
 
 export const revealed = (S, g, i) => i === 0 || own(S, g.id) > 0 || S.total >= g.base * 0.4;
-export const visibleUps = (S) => UPS.filter((u) => !S.ups[u.id] && S.total >= u.cost * 0.3);
+/** An upgrade is listed once this run has mined 30% of its cost (and, for a vessel upgrade, you own enough of that vessel). */
+const upShown = (S, u) => S.total >= u.cost * 0.3 && (!u.vessel || own(S, u.vessel) >= u.need);
+export const visibleUps = (S) => UPS.filter((u) => !S.ups[u.id] && upShown(S, u)).sort((a, b) => a.cost - b.cost);
+/** The cheapest upgrade not yet listed, with what unlocks it: { up, ore } (mine this much) or { up, own, vessel } (own this many). Null when none are left. */
+export function nextUpgrade(S) {
+  const up = UPS.filter((u) => !S.ups[u.id] && !upShown(S, u)).sort((a, b) => a.cost - b.cost)[0];
+  if (!up) return null;
+  if (S.total < up.cost * 0.3) return { up, ore: up.cost * 0.3 };
+  return { up, own: up.need, vessel: up.vessel };
+}
 
 /** Mutates S. Returns { ok, n, cost, milestones: [k...] }. */
 export function buyVessel(S, g, mode) {

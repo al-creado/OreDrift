@@ -27,7 +27,7 @@ export function simulate({ milestones, tapsPerSec = 0, waitForBest = true, maxMi
     for (;;) {
       const items = [];
       for (const g of GENS) items.push({ g, cost: unitCost(S, g) });
-      for (const u of UPS) if (!S.ups[u.id]) items.push({ u, cost: u.cost });
+      for (const u of UPS) if (!S.ups[u.id] && (!u.vessel || own(S, u.vessel) >= u.need)) items.push({ u, cost: u.cost });
       let best = null, bestPay = Infinity;
       for (const it of items) {
         const d = gainOf(it);
