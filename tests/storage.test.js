@@ -100,6 +100,8 @@ describe('parseSave', () => {
     expect(S.weekly.missions[1]).toEqual({ type: 'daily', target: 12, progress: 12, claimed: true });   // progress clamped
     expect(S.weekly.missions[2].claimed).toBe(false);
     expect(parse(serializeState(S, NOW)).weekly).toEqual(S.weekly);
+    expect(parse({ ...goodSave(), weekly: { ...wk, swaps: 2 } }).weekly.swaps).toBe(2);
+    expect(parse({ ...goodSave(), weekly: wk }).weekly.swaps).toBe(0);                                   // an older weekly set has none used
     expect(parse(goodSave()).weekly).toBeNull();                                                          // an older save has none
     expect(parse({ ...goodSave(), weekly: { ...wk, missions: wk.missions.slice(0, 2) } }).weekly).toBeNull();
     expect(parse({ ...goodSave(), weekly: { ...wk, missions: [wk.missions[0], wk.missions[1], { type: 'warp', target: 5 }] } }).weekly).toBeNull();

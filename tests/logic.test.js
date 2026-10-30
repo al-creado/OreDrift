@@ -1216,6 +1216,50 @@ describe('weekly missions', () => {
     S.weekly.missions[2].claimed = true;
     expect(L.goalsReady(S, d)).toBe(false);
   });
+  describe('swapping', () => {
+    const fresh = () => { const S = L.fresh(0); S.allTime = 1e6; L.ensureWeekly(S, D(2026, 11, 4)); return S; };
+    it('replaces the mission with a kind that is not on the list, so the three stay different', () => {
+      const S = fresh(), before = S.weekly.missions.map((m) => m.type);
+      const m = L.swapWeekly(S, 1);
+      expect(before).not.toContain(m.type);
+      expect(S.weekly.missions[1]).toEqual(m);
+      expect(m).toMatchObject({ progress: 0, claimed: false });
+      expect(new Set(S.weekly.missions.map((x) => x.type)).size).toBe(3);
+      expect(S.weekly.missions[0].type).toBe(before[0]);
+      expect(S.weekly.missions[2].type).toBe(before[2]);
+      expect(S.weekly.swaps).toBe(1);
+    });
+    it('the same swap always gives the same mission', () => {
+      expect(L.swapWeekly(fresh(), 0)).toEqual(L.swapWeekly(fresh(), 0));
+    });
+    it('cannot swap a finished or claimed mission, or one that is not there', () => {
+      const S = fresh();
+      S.weekly.missions[0].progress = S.weekly.missions[0].target;
+      expect(L.canSwapWeekly(S, 0)).toBe(false); expect(L.swapWeekly(S, 0)).toBeNull();
+      S.weekly.missions[1].claimed = true;
+      expect(L.canSwapWeekly(S, 1)).toBe(false);
+      expect(L.canSwapWeekly(S, 2)).toBe(true);
+      expect(L.canSwapWeekly(S, 9)).toBe(false);
+      expect(L.canSwapWeekly(L.fresh(0), 0)).toBe(false);
+      expect(S.weekly.swaps).toBe(0);
+    });
+    it('the first swap of the week is free, later ones are not unless ads are removed', () => {
+      const S = fresh();
+      expect(L.swapIsFreeWeekly(S)).toBe(true);
+      L.swapWeekly(S, 0);
+      expect(L.swapIsFreeWeekly(S)).toBe(false);
+      S.iap.removeAds = true;
+      expect(L.swapIsFreeWeekly(S)).toBe(true);
+    });
+    it('is separate from the daily swap, and a new week starts with a free one again', () => {
+      const S = fresh(); L.ensureDaily(S, D(2026, 11, 4));
+      L.swapWeekly(S, 0);
+      expect(L.swapIsFree(S)).toBe(true);              // the daily swap is untouched
+      L.ensureWeekly(S, D(2026, 11, 9));
+      expect(S.weekly.swaps).toBe(0);
+      expect(L.swapIsFreeWeekly(S)).toBe(true);
+    });
+  });
   it('describes the daily-missions goal', () => {
     expect(L.missionText({ type: 'daily', target: 12 })).toBe('Complete 12 daily missions');
   });

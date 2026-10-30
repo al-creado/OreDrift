@@ -7,7 +7,7 @@ const $ = (id) => document.getElementById(id);
 const setText = (el, s) => { if (el.textContent !== s) el.textContent = s; };
 
 /**
- * h: { getState(), onBuy(gen, mode), onBuyUp(up), onClaimMission(i), onSwapMission(i), rewardsOpen(), onClaimChest(), onClaimSupply(),
+ * h: { getState(), onBuy(gen, mode), onBuyUp(up), onClaimMission(i), onSwapMission(i), onClaimWeekly(i), onSwapWeekly(i), rewardsOpen(), onClaimChest(), onClaimSupply(),
  *      onRelocate(), onWipe(), onToggleSound(), onToggleMusic(), onToggleNotify?(), version?,
  *      podInfo(now) -> null | { reward, waitMs, free }, onWatchPod(), onOpenAdPrivacy?(),
  *      priceOf(id), onBuyProduct(product), onRestore(), isBusy(), onOpenJournal() }
@@ -300,8 +300,9 @@ export function createUI(h) {
     const wh = $('weeklies'); wh.textContent = ''; G.w = [];
     for (let i = 0; i < 3; i++) {
       const el = document.createElement('article'); el.className = 'card up';
-      el.innerHTML = '<div class="info"><p class="mtext"></p><div class="track"><div class="fill"></div></div><p class="meta"></p></div><button class="buy" type="button"><span class="bn"></span><span class="bc"></span></button>';
-      const c = { el, text: el.querySelector('.mtext'), fill: el.querySelector('.fill'), meta: el.querySelector('.meta'), btn: el.querySelector('.buy'), bn: el.querySelector('.bn'), bc: el.querySelector('.bc') };
+      el.innerHTML = '<div class="info"><p class="mtext"></p><div class="track"><div class="fill"></div></div><p class="meta"></p><button class="swap" type="button"></button></div><button class="buy" type="button"><span class="bn"></span><span class="bc"></span></button>';
+      const c = { el, swap: el.querySelector('.swap'), text: el.querySelector('.mtext'), fill: el.querySelector('.fill'), meta: el.querySelector('.meta'), btn: el.querySelector('.buy'), bn: el.querySelector('.bn'), bc: el.querySelector('.bc') };
+      c.swap.addEventListener('click', () => h.onSwapWeekly(i));
       c.btn.addEventListener('click', () => {
         h.onClaimWeekly(i);
         if (el.hidden) { const sect = $('weekly-sect'); sect.tabIndex = -1; sect.focus({ preventScroll: true }); } // the claimed card is gone; keep keyboard focus on the page
@@ -422,6 +423,13 @@ export function createUI(h) {
   }
   /** Marks commendations earned just now, so they carry a NEW pill (and the Goals tab a dot) until the player has seen them. */
   function markNew(ids) { ids.forEach((id) => freshAch.add(id)); achKey = ''; }
+  /** The Swap button of a mission card: hidden once the mission is done, and says what the swap costs. */
+  function setSwap(c, done, free, s) {
+    const adOk = h.rewardsOpen();
+    c.swap.hidden = done;
+    setText(c.swap, free ? (L.adsRemoved(s) ? 'Swap' : 'Swap · free') : adOk ? 'Swap · watch ad' : 'Swap · no ad ready');
+    c.swap.disabled = !free && !adOk;
+  }
   function updateGoals(s, date) {
     const D = s.daily; if (!D) return;
     const sh = L.shownStreak(s, date), can = L.canSupply(s, date), nx = Math.min(L.nextStreak(s, date), 7), f = L.supplyFactor(L.nextStreak(s, date));
@@ -446,10 +454,7 @@ export function createUI(h) {
       c.el.hidden = m.claimed; // claimed missions leave the list
       setText(c.text, L.missionText(m)); setFill(c.fill, 100 * m.progress / m.target);
       setText(c.meta, L.fmt(m.progress) + ' / ' + L.fmt(m.target) + '\nReward about ' + L.fmt(rew) + ' t');
-      const free = L.swapIsFree(s), adOk = h.rewardsOpen();
-      c.swap.hidden = done;
-      setText(c.swap, free ? (L.adsRemoved(s) ? 'Swap' : 'Swap · free') : adOk ? 'Swap · watch ad' : 'Swap · no ad ready');
-      c.swap.disabled = !free && !adOk;
+      setSwap(c, done, L.swapIsFree(s), s);
       if (done) setBtn(c, true, 'Claim', '+' + L.fmt(rew));
       else setBtn(c, false, Math.floor(100 * m.progress / m.target) + '%', '');
     });
@@ -462,6 +467,7 @@ export function createUI(h) {
         c.el.hidden = m.claimed;
         setText(c.text, L.missionText(m)); setFill(c.fill, 100 * m.progress / m.target);
         setText(c.meta, L.fmt(m.progress) + ' / ' + L.fmt(m.target) + '\nReward about ' + L.fmt(wrew) + ' t');
+        setSwap(c, done, L.swapIsFreeWeekly(s), s);
         if (done) setBtn(c, true, 'Claim', '+' + L.fmt(wrew));
         else setBtn(c, false, Math.floor(100 * m.progress / m.target) + '%', '');
       });

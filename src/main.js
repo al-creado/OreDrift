@@ -219,22 +219,26 @@ function onClaimMission(i) {
 }
 
 let swapping = false;
-/** Replaces one unfinished daily mission. The first swap of the day is free; later ones ask for a bonus ad. */
-async function onSwapMission(i) {
-  if (swapping || !L.canSwap(S, i)) return;
+/** Runs a mission swap: a free one goes straight through, a later one asks for a bonus ad first. */
+async function trySwap(free, doSwap) {
+  if (swapping) return;
   swapping = true;
   try {
-    if (!L.swapIsFree(S)) {
+    if (!free) {
       if (!rewardsOpen()) { ui.toast('More swaps need a bonus ad, and none is available right now.', 3500); return; }
       const res = await getReward();
       if (res !== 'rewarded') { ui.toast(res === 'closed' ? 'The ad was closed before it finished, so no swap.' : 'No ad available right now. Try again in a moment.', 3500); return; }
     }
-    if (!L.swapMission(S, i)) return;
+    if (!doSwap()) return;
     ui.toast('Mission swapped.');
     sounds.install();
     refresh(); save();
   } finally { swapping = false; }
 }
+/** Replaces one unfinished daily mission. The first swap of the day is free. */
+const onSwapMission = (i) => L.canSwap(S, i) && trySwap(L.swapIsFree(S), () => L.swapMission(S, i));
+/** Replaces one unfinished weekly mission. The first swap of the week is free. */
+const onSwapWeekly = (i) => L.canSwapWeekly(S, i) && trySwap(L.swapIsFreeWeekly(S), () => L.swapWeekly(S, i));
 
 function onClaimWeekly(i) {
   const g = L.claimWeekly(S, i);
@@ -397,7 +401,7 @@ async function boot() {
 
   ui = createUI({
     getState: () => S,
-    onBuy, onBuyUp, onClaimMission, onClaimWeekly, onSwapMission, rewardsOpen, onClaimChest, onClaimSupply, onClaimAch, onRelocate, onWipe, onToggleSound, onToggleHaptics, onToggleMusic,
+    onBuy, onBuyUp, onClaimMission, onClaimWeekly, onSwapMission, onSwapWeekly, rewardsOpen, onClaimChest, onClaimSupply, onClaimAch, onRelocate, onWipe, onToggleSound, onToggleHaptics, onToggleMusic,
     onOpenJournal: () => { S.journalSeen = L.journalCount(S); save(); refresh(); },
     onToggleNotify: native.isNative() ? onToggleNotify : null,
     onRefresh: refresh,

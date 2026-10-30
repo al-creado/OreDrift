@@ -456,10 +456,26 @@ export function makeWeekly(week, allTime) {
 export function ensureWeekly(S, date) {
   const w = weekKey(date);
   if (!S.weekly || S.weekly.week !== w) {
-    S.weekly = { week: w, missions: makeWeekly(w, S.allTime) };
+    S.weekly = { week: w, missions: makeWeekly(w, S.allTime), swaps: 0 };
     return true;
   }
   return false;
+}
+/** Like the daily swap: the first one each week is free, later ones need a bonus ad (free when ads are removed). */
+export const swapIsFreeWeekly = (S) => !S.weekly || (S.weekly.swaps || 0) < FREE_SWAPS || adsRemoved(S);
+export const canSwapWeekly = (S, i) => { const m = S.weekly && S.weekly.missions[i]; return !!m && !m.claimed && m.progress < m.target; };
+/**
+ * Mutates S. Replaces mission i with one of the kinds not on this week's list (so the three stay different),
+ * drawn with the week and the swap count, so the same swap always gives the same mission. Returns the new mission or null.
+ */
+export function swapWeekly(S, i) {
+  if (!canSwapWeekly(S, i)) return null;
+  const W = S.weekly, n = W.swaps || 0, used = W.missions.map((m) => m.type), spare = WEEKLY_TYPES.filter((t) => !used.includes(t));
+  if (!spare.length) return null;
+  const r = rng(hashStr(W.week + ':swap:' + n)), type = spare[Math.floor(r() * spare.length)];
+  W.missions[i] = { type, target: weeklyTarget(type, S.allTime, r), progress: 0, claimed: false };
+  W.swaps = n + 1;
+  return W.missions[i];
 }
 /** An hour of current output, at least 5,000 t: about eight times a daily mission. */
 export const weeklyReward = (S) => minutesOfOre(S, 60, 5000);

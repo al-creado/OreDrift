@@ -86,6 +86,7 @@ export function parseSave(raw, now = Date.now()) {
       W.missions.every((m) => isObj(m) && WEEKLY_TYPES.includes(m.type) && Number.isFinite(m.target) && m.target > 0)) {
     S.weekly = {
       week: W.week,
+      swaps: int(W.swaps, 0),
       missions: W.missions.map((m) => ({
         type: m.type, target: m.target, progress: Math.min(m.target, num(m.progress, 0)), claimed: m.claimed === true,
       })),
