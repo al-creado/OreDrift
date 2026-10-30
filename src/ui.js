@@ -426,9 +426,12 @@ export function createUI(h) {
     const md = $('mdone'); md.hidden = !all;
     if (all) setText(md, 'All done for today. New missions arrive at midnight.');
     G.cache.forEach((d, i) => d.classList.toggle('on', i < got));
+    $('cache-dots').hidden = D.chest; // once opened, the 1 2 3 give way to the countdown
+    $('cache-time').hidden = !D.chest;
+    if (D.chest) setText($('cache-time'), 'Next in ' + Math.floor(left / 60) + 'h ' + (left % 60) + 'm');
     $('cache-dots').setAttribute('aria-label', got + ' of 3 missions claimed');
     setText($('cache-note'), D.chest
-      ? 'Opened for today. A new cache arrives at midnight.'
+      ? 'Opened for today. The next one arrives at midnight.'
       : (all ? 'Ready to open.' : 'Claim all three missions to unlock it.') + ' Pays about ' + L.fmt(cr) + ' t and ×' + FRENZY_MULT + ' output for 60\u00a0s.');
     const cb = $('cache-btn'); cb.disabled = D.chest || !all;
     setText(cb, D.chest ? 'Opened' : all ? 'Open +' + L.fmt(cr) : 'Locked');
