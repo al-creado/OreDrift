@@ -156,6 +156,8 @@ canvas { display: block; width: 100%; height: 100%; touch-action: none; outline-
 .fill { height: 100%; width: 0; background: var(--ore); transition: width .3s; }
 .track + .meta { margin-top: 6px; }
 .mlist, .alist { display: grid; gap: 8px; }
+.swap { justify-self: start; min-height: 40px; margin-top: 4px; padding: 0 12px; border: 1px solid var(--line); border-radius: 8px; color: var(--muted); font: 600 .75rem var(--f-mono); }
+.swap:disabled { opacity: .5; }
 .dots { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
 .dots.three { grid-template-columns: repeat(3, 1fr); }
 .dot { display: grid; place-items: center; height: 38px; border: 1px solid var(--line); border-radius: 8px; background: var(--ink); font: 600 .85rem var(--f-mono); color: var(--muted); }

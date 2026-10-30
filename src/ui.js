@@ -7,7 +7,7 @@ const $ = (id) => document.getElementById(id);
 const setText = (el, s) => { if (el.textContent !== s) el.textContent = s; };
 
 /**
- * h: { getState(), onBuy(gen, mode), onBuyUp(up), onClaimMission(i), onClaimChest(), onClaimSupply(),
+ * h: { getState(), onBuy(gen, mode), onBuyUp(up), onClaimMission(i), onSwapMission(i), rewardsOpen(), onClaimChest(), onClaimSupply(),
  *      onRelocate(), onWipe(), onToggleSound(), onToggleMusic(), onToggleNotify?(), version?,
  *      podInfo(now) -> null | { reward, waitMs, free }, onWatchPod(), onOpenAdPrivacy?(),
  *      priceOf(id), onBuyProduct(product), onRestore(), isBusy(), onOpenJournal() }
@@ -273,8 +273,9 @@ export function createUI(h) {
     const host = $('missions'); host.textContent = ''; G.m = [];
     for (let i = 0; i < 3; i++) {
       const el = document.createElement('article'); el.className = 'card up';
-      el.innerHTML = '<div class="info"><p class="mtext"></p><div class="track"><div class="fill"></div></div><p class="meta"></p></div><button class="buy" type="button"><span class="bn"></span><span class="bc"></span></button>';
-      const c = { el, text: el.querySelector('.mtext'), fill: el.querySelector('.fill'), meta: el.querySelector('.meta'), btn: el.querySelector('.buy'), bn: el.querySelector('.bn'), bc: el.querySelector('.bc') };
+      el.innerHTML = '<div class="info"><p class="mtext"></p><div class="track"><div class="fill"></div></div><p class="meta"></p><button class="swap" type="button"></button></div><button class="buy" type="button"><span class="bn"></span><span class="bc"></span></button>';
+      const c = { el, swap: el.querySelector('.swap'), text: el.querySelector('.mtext'), fill: el.querySelector('.fill'), meta: el.querySelector('.meta'), btn: el.querySelector('.buy'), bn: el.querySelector('.bn'), bc: el.querySelector('.bc') };
+      c.swap.addEventListener('click', () => h.onSwapMission(i));
       c.btn.addEventListener('click', () => {
         h.onClaimMission(i);
         if (el.hidden) $('cache-btn').focus(); // the claimed card is gone; keep keyboard focus on the page
@@ -419,6 +420,10 @@ export function createUI(h) {
       c.el.hidden = m.claimed; // claimed missions leave the list
       setText(c.text, L.missionText(m)); setFill(c.fill, 100 * m.progress / m.target);
       setText(c.meta, L.fmt(m.progress) + ' / ' + L.fmt(m.target) + '\nReward about ' + L.fmt(rew) + ' t');
+      const free = L.swapIsFree(s), adOk = h.rewardsOpen();
+      c.swap.hidden = done;
+      setText(c.swap, free ? (L.adsRemoved(s) ? 'Swap' : 'Swap · free') : adOk ? 'Swap · watch ad' : 'Swap · no ad ready');
+      c.swap.disabled = !free && !adOk;
       if (done) setBtn(c, true, 'Claim', '+' + L.fmt(rew));
       else setBtn(c, false, Math.floor(100 * m.progress / m.target) + '%', '');
     });

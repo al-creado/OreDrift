@@ -217,6 +217,24 @@ function onClaimMission(i) {
   refresh(); save();
 }
 
+let swapping = false;
+/** Replaces one unfinished daily mission. The first swap of the day is free; later ones ask for a bonus ad. */
+async function onSwapMission(i) {
+  if (swapping || !L.canSwap(S, i)) return;
+  swapping = true;
+  try {
+    if (!L.swapIsFree(S)) {
+      if (!rewardsOpen()) { ui.toast('More swaps need a bonus ad, and none is available right now.', 3500); return; }
+      const res = await getReward();
+      if (res !== 'rewarded') { ui.toast(res === 'closed' ? 'The ad was closed before it finished, so no swap.' : 'No ad available right now. Try again in a moment.', 3500); return; }
+    }
+    if (!L.swapMission(S, i)) return;
+    ui.toast('Mission swapped.');
+    sounds.install();
+    refresh(); save();
+  } finally { swapping = false; }
+}
+
 function onClaimChest() {
   const g = L.claimChest(S, Date.now());
   if (!g) return;
@@ -370,7 +388,7 @@ async function boot() {
 
   ui = createUI({
     getState: () => S,
-    onBuy, onBuyUp, onClaimMission, onClaimChest, onClaimSupply, onClaimAch, onRelocate, onWipe, onToggleSound, onToggleHaptics, onToggleMusic,
+    onBuy, onBuyUp, onClaimMission, onSwapMission, rewardsOpen, onClaimChest, onClaimSupply, onClaimAch, onRelocate, onWipe, onToggleSound, onToggleHaptics, onToggleMusic,
     onOpenJournal: () => { S.journalSeen = L.journalCount(S); save(); refresh(); },
     onToggleNotify: native.isNative() ? onToggleNotify : null,
     onRefresh: refresh,

@@ -1090,6 +1090,58 @@ describe("the Captain's journal", () => {
   });
 });
 
+describe('swapping a daily mission', () => {
+  const daily = (extra = {}) => {
+    const S = L.fresh(0); S.allTime = 1e6;
+    L.ensureDaily(S, new Date(2026, 10, 2));
+    return Object.assign(S, extra);
+  };
+  it('replaces the mission with the type that is not on the list, so the three stay different', () => {
+    const S = daily(), before = S.daily.missions.map((m) => m.type);
+    const spare = ['tap', 'mine', 'buy', 'comet'].find((t) => !before.includes(t));
+    const m = L.swapMission(S, 1);
+    expect(m.type).toBe(spare);
+    expect(S.daily.missions[1]).toEqual(m);
+    expect(m).toMatchObject({ progress: 0, claimed: false });
+    expect(new Set(S.daily.missions.map((x) => x.type)).size).toBe(3);
+    expect(S.daily.missions[0].type).toBe(before[0]); // the others are untouched
+    expect(S.daily.missions[2].type).toBe(before[2]);
+  });
+  it('the same swap always gives the same mission, and the next swap differs from it', () => {
+    const a = daily(), b = daily();
+    expect(L.swapMission(a, 0)).toEqual(L.swapMission(b, 0));
+    expect(a.daily.swaps).toBe(1);
+    const again = L.swapMission(a, 0);
+    expect(again.type).not.toBe(a.daily.missions[1].type);
+  });
+  it('cannot swap a finished or claimed mission, or one that does not exist', () => {
+    const S = daily();
+    S.daily.missions[0].progress = S.daily.missions[0].target;
+    expect(L.canSwap(S, 0)).toBe(false); expect(L.swapMission(S, 0)).toBeNull();
+    S.daily.missions[1].claimed = true;
+    expect(L.canSwap(S, 1)).toBe(false);
+    expect(L.canSwap(S, 2)).toBe(true);
+    expect(L.canSwap(S, 7)).toBe(false);
+    expect(L.canSwap(L.fresh(0), 0)).toBe(false); // no missions yet
+    expect(S.daily.swaps).toBe(0);                // nothing was spent
+  });
+  it('the first swap of the day is free, later ones are not unless ads are removed', () => {
+    const S = daily();
+    expect(L.swapIsFree(S)).toBe(true);
+    L.swapMission(S, 0);
+    expect(L.swapIsFree(S)).toBe(false);
+    S.iap.removeAds = true;
+    expect(L.swapIsFree(S)).toBe(true);
+  });
+  it('a new day starts with a free swap again', () => {
+    const S = daily();
+    L.swapMission(S, 0);
+    L.ensureDaily(S, new Date(2026, 10, 3));
+    expect(S.daily.swaps).toBe(0);
+    expect(L.swapIsFree(S)).toBe(true);
+  });
+});
+
 describe('weekly events', () => {
   const D = (y, m, d) => new Date(y, m - 1, d, 12); // 2026-10-31 is a Saturday
   it('the meteor weekend runs Saturday and Sunday and ends at Monday midnight', () => {

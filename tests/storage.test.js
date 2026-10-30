@@ -83,6 +83,13 @@ describe('parseSave', () => {
     expect(parse({ haptics: 'no' }).haptics).toBe(true);
   });
 
+  it('keeps the number of mission swaps used today, and an older save has none', () => {
+    const g = goodSave();
+    expect(parse({ ...g, daily: { ...g.daily, swaps: 2 } }).daily.swaps).toBe(2);
+    expect(parse(g).daily.swaps).toBe(0);
+    expect(parse({ ...g, daily: { ...g.daily, swaps: -3 } }).daily.swaps).toBe(0);
+  });
+
   it('wrong container types are ignored, not fatal', () => {
     const S = parse({ ...goodSave(), owned: [1, 2], ups: 'x', ach: 5, stats: null, daily: 'x' });
     expect(S.owned).toEqual({});

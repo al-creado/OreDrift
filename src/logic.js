@@ -373,21 +373,40 @@ export function makeMissions(day, allTime) {
     const j = Math.floor(r() * (i + 1));
     const x = types[i]; types[i] = types[j]; types[j] = x;
   }
-  return types.slice(0, 3).map((type) => {
-    let target;
-    if (type === 'tap') target = TAP_TARGETS[Math.floor(r() * 3)];
-    else if (type === 'mine') target = niceRound(Math.max(3000, allTime * 0.04));
-    else if (type === 'buy') target = 8 + Math.floor(r() * 13);
-    else target = 2 + Math.floor(r() * 3);
-    return { type, target, progress: 0, claimed: false };
-  });
+  return types.slice(0, 3).map((type) => ({ type, target: missionTarget(type, allTime, r), progress: 0, claimed: false }));
+}
+/** The goal for one mission type; r is a 0..1 generator. */
+function missionTarget(type, allTime, r) {
+  if (type === 'tap') return TAP_TARGETS[Math.floor(r() * 3)];
+  if (type === 'mine') return niceRound(Math.max(3000, allTime * 0.04));
+  if (type === 'buy') return 8 + Math.floor(r() * 13);
+  return 2 + Math.floor(r() * 3);
+}
+
+/** The first swap of each day is free; later ones need a bonus ad (free when ads are removed). */
+export const FREE_SWAPS = 1;
+export const swapIsFree = (S) => !S.daily || (S.daily.swaps || 0) < FREE_SWAPS || adsRemoved(S);
+/** A mission can be swapped while it is neither finished nor claimed. */
+export const canSwap = (S, i) => { const m = S.daily && S.daily.missions[i]; return !!m && !m.claimed && m.progress < m.target; };
+/**
+ * Mutates S. Replaces mission i with the kind of mission that is not on today's list (so the three stay different),
+ * with a goal drawn from the day and the swap count, so the same swap always gives the same mission. Returns the new mission or null.
+ */
+export function swapMission(S, i) {
+  if (!canSwap(S, i)) return null;
+  const D = S.daily, n = D.swaps || 0, used = D.missions.map((m) => m.type);
+  const type = MISSION_TYPES.find((t) => !used.includes(t));
+  if (!type) return null;
+  D.missions[i] = { type, target: missionTarget(type, S.allTime, rng(hashStr(D.day + ':swap:' + n))), progress: 0, claimed: false };
+  D.swaps = n + 1;
+  return D.missions[i];
 }
 
 /** Regenerates missions if the day changed. Mutates S. Returns true when it did. */
 export function ensureDaily(S, date) {
   const d = dayKey(date);
   if (!S.daily || S.daily.day !== d) {
-    S.daily = { day: d, missions: makeMissions(d, S.allTime), chest: false };
+    S.daily = { day: d, missions: makeMissions(d, S.allTime), chest: false, swaps: 0 };
     return true;
   }
   return false;
