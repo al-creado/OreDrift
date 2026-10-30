@@ -89,6 +89,7 @@ canvas { display: block; width: 100%; height: 100%; touch-action: none; outline-
   transform: translate(-50%, -170%); opacity: 0;
   transition: transform .5s cubic-bezier(.2, .9, .25, 1.08), opacity .3s;
 }
+.achpop { cursor: pointer; }
 .achpop.show { transform: translate(-50%, 0); opacity: 1; }
 .achpop .ico { flex: none; display: grid; place-items: center; width: 48px; height: 48px; border-radius: 50%; background: var(--tier); color: #1c1206; font-size: 1.6rem; box-shadow: 0 0 16px var(--glow); }
 .achpop .txt { min-width: 0; }
@@ -159,6 +160,8 @@ canvas { display: block; width: 100%; height: 100%; touch-action: none; outline-
 .card.ach { grid-template-columns: 52px minmax(0, 1fr); }
 .card.ach.claim { grid-template-columns: 52px minmax(0, 1fr) auto; }
 .card.ach .count { font-size: .85rem; color: var(--muted); }
+.card.ach { transition: box-shadow .6s, border-color .6s; }
+.card.ach.spot { border-color: var(--ore); box-shadow: 0 0 0 2px var(--ore), 0 0 18px rgba(242, 162, 78, .45); }
 .card.ach.done { border-color: var(--ore-deep); }
 .card.ach.done .count { background: var(--ore); border-color: var(--ore); color: var(--ore-ink); font-size: 1.2rem; }
 .card.ach .name { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; }

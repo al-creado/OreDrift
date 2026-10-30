@@ -66,10 +66,10 @@ export function createUI(h) {
   // Tier colours: Bronze, Silver, Gold, Platinum, each with a matching soft glow.
   const TIER_LOOK = [['#d58a5a', 'rgba(213,138,90,.45)'], ['#c3cadb', 'rgba(195,202,219,.4)'], ['#f2c14e', 'rgba(242,193,78,.5)'], ['#8fe3ff', 'rgba(143,227,255,.45)']];
   const achQ = [];
-  let achBusy = false, achTimer = 0;
+  let achBusy = false, achTimer = 0, achShown = null; // achShown: the banner item on screen right now
   const ACH_SHOW_MS = 4200;
 
-  /** item: { kicker, name, tier (1..5), sub?, reward } */
+  /** item: { kicker, name, tier (1..5), sub?, reward, chain? } (chain: the commendation chain a tap on the banner opens) */
   function achPop(item) {
     if (achQ.length >= 8) achQ.shift();
     achQ.push(item);
@@ -77,6 +77,7 @@ export function createUI(h) {
   }
   function nextAchPop() {
     const pop = $('achpop'), item = achQ.shift();
+    achShown = item || null;
     clearTimeout(achTimer);
     if (!item) {
       achBusy = false; pop.classList.remove('show');
@@ -217,6 +218,7 @@ export function createUI(h) {
   /* ---------- goals ---------- */
   const G = { dots: [], m: [], cache: [] }, achEls = [];
   let achKey = '', achView = 'type'; // view: next (closest to done), type (grouped), done (earned)
+  let goalsFocus = null; // { chain } or { any: true }: scroll to a commendation reward the next time the Goals tab draws
   const freshAch = new Set(); // earned this session; shown with a NEW pill until the Goals tab is left
   function buildGoals() {
     const dots = $('dots'); dots.textContent = ''; G.dots = [];
@@ -383,6 +385,22 @@ export function createUI(h) {
     setText(cb, D.chest ? 'Opened' : all ? 'Open +' + L.fmt(cr) : 'Locked');
 
     updateAch(s);
+    if (goalsFocus) { const f = goalsFocus; goalsFocus = null; spotlightReward(s, f); }
+  }
+  /** Scrolls to a commendation card and flashes it: the given chain's, or else the first with a reward waiting. */
+  function spotlightReward(s, f) {
+    const find = () => (f.chain ? achEls.find((e) => e.chain.id === f.chain) : achEls.find((e) => !e.btn.hidden));
+    let e = find();
+    if (!e && (f.chain || L.pendingGifts(s).count > 0)) { // the current view leaves it out: show every chain
+      achView = 'type'; achKey = '';
+      document.querySelectorAll('#achseg button').forEach((x) => x.setAttribute('aria-pressed', String(x.dataset.v === 'type')));
+      updateAch(s);
+      e = find();
+    }
+    if (!e) return; // nothing waiting: stay at the top, where the daily rewards are
+    e.root.scrollIntoView({ block: 'center', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+    e.root.classList.add('spot');
+    setTimeout(() => e.root.classList.remove('spot'), 1800);
   }
   const resetAchList = () => { achKey = ''; freshAch.clear(); };
 
@@ -465,6 +483,7 @@ export function createUI(h) {
   function selectTab(name) {
     if (activeTab === 'goals' && name !== 'goals') { freshAch.clear(); achKey = ''; } // seen now
     if (name === 'goals') achKey = ''; // rebuild so "Next up" is current
+    if (name === 'goals' && activeTab !== 'goals') goalsFocus = goalsFocus || { any: true }; // coming from another tab: look for waiting rewards
     activeTab = name;
     document.querySelectorAll('.nav button').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tab === name)));
     TABS.forEach((t) => { $('tab-' + t).hidden = t !== name; });
@@ -495,7 +514,14 @@ export function createUI(h) {
     $('snd').addEventListener('click', h.onToggleSound);
     $('mus').addEventListener('click', h.onToggleMusic);
     $('toast').addEventListener('click', nextToast);
-    $('achpop').addEventListener('click', hideAchPop);
+    $('achpop').addEventListener('click', () => {
+      const item = achShown;
+      hideAchPop();
+      closeJournal();
+      goalsFocus = item && item.chain ? { chain: item.chain } : { any: true };
+      if (activeTab !== 'goals') selectTab('goals');
+      h.onRefresh();
+    });
     $('journal-open').addEventListener('click', openJournal);
     $('journal-close').addEventListener('click', closeJournal);
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeJournal(); });

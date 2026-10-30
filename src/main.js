@@ -111,7 +111,7 @@ function announceAch(list) {
   ui.markNew(list.map((a) => a.id));
   if (list.length <= 3) {
     list.forEach((a, i) => ui.achPop({
-      kicker: 'Commendation earned', name: a.name, tier: a.tier, sub: a.desc,
+      kicker: 'Commendation earned', chain: a.chain, name: a.name, tier: a.tier, sub: a.desc,
       reward: '+' + pctText(L.achBonus(a)) + ' output and taps · ' + L.fmt(gifts[i]) + ' t to claim on Goals',
     }));
   } else {
