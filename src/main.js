@@ -414,6 +414,15 @@ function frame() {
   requestAnimationFrame(frame);
 }
 
+/* ---------- splash ---------- */
+const BOOT_MIN_MS = 1200; // the splash stays at least this long after the page starts, so it does not just flash
+function hideBoot() {
+  const el = document.getElementById('boot');
+  if (!el) return;
+  setTimeout(() => { el.classList.add('hide'); setTimeout(() => el.remove(), 700); }, Math.max(0, BOOT_MIN_MS - performance.now()));
+}
+setTimeout(hideBoot, 6000); // even if starting up fails, the splash never covers the screen for good
+
 /* ---------- boot ---------- */
 async function boot() {
   const loaded = await loadState(Date.now());
@@ -476,6 +485,7 @@ async function boot() {
   if (evNow) ui.toast('Event: ' + evNow.name + '. ' + evNow.desc, 5000);
   refresh();
   if (!S.tutorial) ui.showTutorial(); // first launch only
+  hideBoot();
 
   // Store first (it can restore "Remove ads" on a new phone), then ads. None of this blocks play; failure just hides the buttons.
   (async () => {
