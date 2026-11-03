@@ -258,14 +258,14 @@ export function createUI(h) {
   function updateSkins(s) {
     const spare = L.spendablePoints(s);
     setText($('skin-pts'), String(spare));
-    setText($('skin-note'), 'Skins only change how the game looks. Spending survey points on them never lowers your bonus, and every point still counts for output.');
+    setText($('skin-note'), 'Skins are bought with survey points and only change how the game looks. Spending survey points on them never lowers your bonus, and every point still counts for output.');
     skinEls.forEach((c) => {
       const k = c.skin, worn = k.id ? L.wornSkin(s, k.slot) === k : !L.wornSkin(s, k.slot);
       const owned = !k.id || L.owns_skin(s, k.id);
       setText(c.meta, owned ? (k.meta || 'Owned') : 'Costs ' + k.cost + ' survey point' + (k.cost === 1 ? '' : 's'));
       if (worn) setBtn(c, false, 'Worn', '');
       else if (owned) setBtn(c, true, 'Wear', '');
-      else setBtn(c, spare >= k.cost, 'Buy', k.cost + ' pt' + (k.cost === 1 ? '' : 's'));
+      else setBtn(c, spare >= k.cost, 'Buy', k.cost + ' survey pt' + (k.cost === 1 ? '' : 's'));
     });
   }
 
