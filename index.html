@@ -101,12 +101,40 @@
           </div>
         </section>
 
+        <section class="scroll" id="tab-captain" role="tabpanel" aria-label="Captain's log" hidden>
+          <div class="in list">
+            <div class="sect">
+              <h2>Captain's journal</h2>
+              <p class="note" id="jnote"></p>
+              <button class="btn" id="journal-open" type="button">Read the journal <span class="newpill" id="jnew" hidden>New</span></button>
+            </div>
+            <div class="sect">
+              <h2>Logbook</h2>
+              <dl class="stats">
+                <dt>Lifetime ore</dt><dd id="st-all">0 t</dd>
+                <dt>This run</dt><dd id="st-run">0 t</dd>
+                <dt>Taps</dt><dd id="st-taps">0</dd>
+                <dt>Vessels</dt><dd id="st-fleet">0</dd>
+                <dt>Relocations</dt><dd id="st-runs">0</dd>
+                <dt>Time played</dt><dd id="st-played">0 m</dd>
+                <dt>Highest output</dt><dd id="st-peak">0 t/s</dd>
+                <dt>Comets and ships caught</dt><dd id="st-comets">0</dd>
+                <dt>Best catch streak</dt><dd id="st-run-best">0</dd>
+                <dt>Missions done</dt><dd id="st-missions">0</dd>
+                <dt>Best supply streak</dt><dd id="st-best">0 days</dd>
+                <dt>Commendations</dt><dd id="st-ach">0</dd>
+                <dt>Rank</dt><dd id="st-rank">Rookie</dd>
+              </dl>
+            </div>
+          </div>
+        </section>
+
         <section class="scroll" id="tab-belt" role="tabpanel" aria-label="Belt" hidden>
           <div class="in list">
             <div class="seg beltseg" id="beltseg" role="group" aria-label="Belt sections">
               <button type="button" data-v="relocate" aria-pressed="true">Relocate<span class="badge" id="bs-relocate" hidden></span></button>
               <button type="button" data-v="cosmetics" aria-pressed="false">Cosmetics</button>
-              <button type="button" data-v="more" aria-pressed="false">More<span class="badge" id="bs-more" hidden></span></button>
+              <button type="button" data-v="settings" aria-pressed="false">Settings</button>
             </div>
             <div class="sect" data-bview="relocate">
               <h2>Relocate</h2>
@@ -134,30 +162,7 @@
               <p class="note" id="skin-note"></p>
               <div id="skins"></div>
             </div>
-            <div class="sect" data-bview="more" hidden>
-              <h2>Captain's journal</h2>
-              <p class="note" id="jnote"></p>
-              <button class="btn" id="journal-open" type="button">Read the journal <span class="newpill" id="jnew" hidden>New</span></button>
-            </div>
-            <div class="sect" data-bview="more" hidden>
-              <h2>Logbook</h2>
-              <dl class="stats">
-                <dt>Lifetime ore</dt><dd id="st-all">0 t</dd>
-                <dt>This run</dt><dd id="st-run">0 t</dd>
-                <dt>Taps</dt><dd id="st-taps">0</dd>
-                <dt>Vessels</dt><dd id="st-fleet">0</dd>
-                <dt>Relocations</dt><dd id="st-runs">0</dd>
-                <dt>Time played</dt><dd id="st-played">0 m</dd>
-                <dt>Highest output</dt><dd id="st-peak">0 t/s</dd>
-                <dt>Comets and ships caught</dt><dd id="st-comets">0</dd>
-                <dt>Best catch streak</dt><dd id="st-run-best">0</dd>
-                <dt>Missions done</dt><dd id="st-missions">0</dd>
-                <dt>Best supply streak</dt><dd id="st-best">0 days</dd>
-                <dt>Commendations</dt><dd id="st-ach">0</dd>
-                <dt>Rank</dt><dd id="st-rank">Rookie</dd>
-              </dl>
-            </div>
-            <div class="sect" data-bview="more" hidden>
+            <div class="sect" data-bview="settings" hidden>
               <h2>Settings</h2>
               <div class="row"><span>Sound effects</span><button class="btn" id="snd" type="button" aria-pressed="true">On</button></div>
               <div class="row"><span>Music</span><button class="btn" id="mus" type="button" aria-pressed="true">On</button></div>
@@ -181,6 +186,7 @@
         <button type="button" role="tab" aria-selected="false" data-tab="ups" aria-label="Upgrades" title="Upgrades"><span class="badge" id="b-ups" hidden></span></button>
         <button type="button" role="tab" aria-selected="false" data-tab="goals" aria-label="Goals" title="Goals"><span class="badge" id="b-goals" hidden></span></button>
         <button type="button" role="tab" aria-selected="false" data-tab="belt" aria-label="Belt" title="Belt"><span class="badge" id="b-belt" hidden></span></button>
+        <button type="button" role="tab" aria-selected="false" data-tab="captain" aria-label="Captain's log" title="Captain's log"><span class="badge" id="b-captain" hidden></span></button>
         <button type="button" role="tab" aria-selected="false" data-tab="shop" id="nav-shop" aria-label="Shop" title="Shop" hidden></button>
       </nav>
     </div>

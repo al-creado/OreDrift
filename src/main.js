@@ -99,7 +99,7 @@ function housekeeping(now) {
   const chapters = L.journalUnlocked(S);
   if (knownChapters >= 0 && chapters.length > knownChapters) {
     const fresh = chapters.slice(knownChapters);
-    ui.toast(fresh.length === 1 ? 'New journal entry: ' + fresh[0].title + '. Read it on the Belt tab.' : fresh.length + ' new journal entries. Read them on the Belt tab.', 4500);
+    ui.toast(fresh.length === 1 ? 'New journal entry: ' + fresh[0].title + '. Read it in the Captain\'s log.' : fresh.length + ' new journal entries. Read them in the Captain\'s log.', 4500);
   }
   knownChapters = chapters.length;
 }

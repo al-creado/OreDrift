@@ -309,16 +309,28 @@ export function createUI(h) {
     document.querySelectorAll('#beltseg button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === v)));
     document.querySelectorAll('[data-bview]').forEach((el) => { el.hidden = el.dataset.bview !== v; });
   }
-  function updateBelt(s) {
-    if (activeTab !== 'belt') return;
-    $('bs-relocate').hidden = L.prestigeGain(s) < 1;           // a survey point is waiting
-    $('bs-more').hidden = !(L.journalCount(s) > s.journalSeen); // a new journal chapter
-    const pv = L.relocatePreview(s), g = pv.gain;
-    setText($('pts'), String(s.points));
-    updateSkins(s);
+  /* ---------- captain's log: journal and logbook ---------- */
+  function updateCaptain(s) {
+    if (activeTab !== 'captain') return;
     const chapters = L.journalCount(s);
     setText($('jnote'), chapters + ' of ' + JOURNAL.length + ' chapters unlocked. A story of the Drift, told as you go.');
     $('jnew').hidden = chapters <= s.journalSeen;
+    setText($('st-all'), L.fmt(s.allTime) + ' t'); setText($('st-run'), L.fmt(s.total) + ' t');
+    setText($('st-taps'), s.taps.toLocaleString('en-US'));
+    setText($('st-fleet'), String(L.fleetCount(s)));
+    setText($('st-runs'), String(s.runs));
+    setText($('st-comets'), String(s.stats.comets)); setText($('st-missions'), String(s.stats.missions));
+    setText($('st-played'), L.fmtDur(s.stats.played)); setText($('st-peak'), L.fmt(s.stats.peak) + ' t/s'); setText($('st-run-best'), String(s.stats.bestRun));
+    setText($('st-best'), s.stats.best + (s.stats.best === 1 ? ' day' : ' days')); setText($('st-ach'), L.achCount(s) + ' of ' + ACHS.length);
+    setText($('st-rank'), L.rankFor(L.achCount(s)).name);
+  }
+
+  function updateBelt(s) {
+    if (activeTab !== 'belt') return;
+    $('bs-relocate').hidden = L.prestigeGain(s) < 1;           // a survey point is waiting
+    const pv = L.relocatePreview(s), g = pv.gain;
+    setText($('pts'), String(s.points));
+    updateSkins(s);
     setText($('beltname'), 'Current belt: ' + beltFor(s.runs).name);
     $('relocate').disabled = g < 1;
 
@@ -335,14 +347,6 @@ export function createUI(h) {
     setText($('rl-belt'), beltFor(s.runs).name + ' → ' + beltFor(s.runs + 1).name);
     const lose = pv.lose;
     setText($('rl-lose'), L.fmt(lose.ore) + ' t of ore, ' + lose.vessels + ' vessel' + (lose.vessels === 1 ? '' : 's') + ', ' + lose.upgrades + ' upgrade' + (lose.upgrades === 1 ? '' : 's') + ' and this run\'s ' + L.fmt(lose.run) + ' t of progress.');
-    setText($('st-all'), L.fmt(s.allTime) + ' t'); setText($('st-run'), L.fmt(s.total) + ' t');
-    setText($('st-taps'), s.taps.toLocaleString('en-US'));
-    setText($('st-fleet'), String(L.fleetCount(s)));
-    setText($('st-runs'), String(s.runs));
-    setText($('st-comets'), String(s.stats.comets)); setText($('st-missions'), String(s.stats.missions));
-    setText($('st-played'), L.fmtDur(s.stats.played)); setText($('st-peak'), L.fmt(s.stats.peak) + ' t/s'); setText($('st-run-best'), String(s.stats.bestRun));
-    setText($('st-best'), s.stats.best + (s.stats.best === 1 ? ' day' : ' days')); setText($('st-ach'), L.achCount(s) + ' of ' + ACHS.length);
-    setText($('st-rank'), L.rankFor(L.achCount(s)).name);
     setText($('snd'), s.sound ? 'On' : 'Off'); $('snd').setAttribute('aria-pressed', String(s.sound));
     setText($('mus'), s.music ? 'On' : 'Off'); $('mus').setAttribute('aria-pressed', String(s.music));
     setText($('hap'), s.haptics ? 'On' : 'Off'); $('hap').setAttribute('aria-pressed', String(s.haptics));
@@ -662,14 +666,15 @@ export function createUI(h) {
     updateFleet(s); updatePod(s, date); updateUps(s);
     if (activeTab === 'goals') updateGoals(s, date);
     if (activeTab === 'shop') updateShop(s);
-    updateBelt(s);
+    updateBelt(s); updateCaptain(s);
     $('b-ups').hidden = !L.visibleUps(s).some((u) => s.ore >= u.cost);
     $('b-goals').hidden = !(L.goalsReady(s, date) || (freshAch.size > 0 && activeTab !== 'goals'));
-    $('b-belt').hidden = !(L.prestigeGain(s) >= 1 || L.journalCount(s) > s.journalSeen);
+    $('b-belt').hidden = !(L.prestigeGain(s) >= 1);
+    $('b-captain').hidden = !(L.journalCount(s) > s.journalSeen);
   }
 
   /* ---------- tabs and controls ---------- */
-  const TABS = ['fleet', 'ups', 'goals', 'shop', 'belt'];
+  const TABS = ['fleet', 'ups', 'goals', 'shop', 'belt', 'captain'];
   function selectTab(name) {
     if (activeTab === 'goals' && name !== 'goals') { freshAch.clear(); achKey = ''; } // seen now
     if (name === 'goals') achKey = ''; // rebuild so "Next up" is current
