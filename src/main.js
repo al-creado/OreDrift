@@ -23,10 +23,10 @@ import * as store from './store.js';
 const PRIVACY_URL = 'https://al-creado.github.io/OreDrift/';
 const SAVE_EVERY_MS = 5000;
 /*
- * The Shop tab and Google Play Billing stay switched off until the in-app products exist in Play Console.
- * Set to true once they do (see store/listing.md). The dev-only ?mockstore flag still turns it on for a desktop try-out.
+ * The Shop tab and Google Play Billing. The in-app products must exist and be active in Play Console (see store/listing.md);
+ * until Play has them the items read "Unavailable". The dev-only ?mockstore flag turns the store on for a desktop try-out.
  */
-const SHOP_ENABLED = false;
+const SHOP_ENABLED = true;
 const shopOn = () => SHOP_ENABLED || store.isMock();
 
 const $ = (id) => document.getElementById(id);
