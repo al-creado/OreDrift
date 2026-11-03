@@ -185,6 +185,9 @@ canvas { display: block; width: 100%; height: 100%; touch-action: none; outline-
 .card.ach.mystery { border-style: dashed; opacity: .75; }
 .card.ach.mystery .count { color: var(--ore); font-size: 1.4rem; }
 .earned { margin: 6px 0 0; color: var(--muted); font: 500 .72rem/1.5 var(--f-mono); }
+.beltseg { display: flex; }
+.beltseg button { position: relative; flex: 1; }
+.beltseg .badge { top: 8px; right: 10px; }
 .sw { display: inline-block; width: 14px; height: 14px; margin-right: 8px; border-radius: 50%; border: 1px solid var(--line); vertical-align: -1px; }
 .skinlist { display: grid; gap: 8px; margin-top: 8px; }
 .grp { margin: 14px 0 0; font: 700 .8rem/1 var(--f-display); letter-spacing: .16em; text-transform: uppercase; color: var(--muted); }

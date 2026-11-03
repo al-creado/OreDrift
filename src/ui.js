@@ -270,8 +270,16 @@ export function createUI(h) {
   }
 
   /* ---------- belt ---------- */
+  let beltView = 'relocate'; // relocate | cosmetics | more
+  function setBeltView(v) {
+    beltView = v;
+    document.querySelectorAll('#beltseg button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === v)));
+    document.querySelectorAll('[data-bview]').forEach((el) => { el.hidden = el.dataset.bview !== v; });
+  }
   function updateBelt(s) {
     if (activeTab !== 'belt') return;
+    $('bs-relocate').hidden = L.prestigeGain(s) < 1;           // a survey point is waiting
+    $('bs-more').hidden = !(L.journalCount(s) > s.journalSeen); // a new journal chapter
     const pv = L.relocatePreview(s), g = pv.gain;
     setText($('pts'), String(s.points));
     updateSkins(s);
@@ -676,6 +684,10 @@ export function createUI(h) {
       h.onRefresh();
     });
     $('journal-open').addEventListener('click', openJournal);
+    document.querySelectorAll('#beltseg button').forEach((b) => b.addEventListener('click', () => {
+      if (b.dataset.v === beltView) return;
+      setBeltView(b.dataset.v); $('tab-belt').scrollTop = 0; // each view starts at the top
+    }));
     $('journal-close').addEventListener('click', closeJournal);
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeJournal(); });
     if (h.version) setText($('version'), h.version);

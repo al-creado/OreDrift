@@ -103,7 +103,12 @@
 
         <section class="scroll" id="tab-belt" role="tabpanel" aria-label="Belt" hidden>
           <div class="in list">
-            <div class="sect">
+            <div class="seg beltseg" id="beltseg" role="group" aria-label="Belt sections">
+              <button type="button" data-v="relocate" aria-pressed="true">Relocate<span class="badge" id="bs-relocate" hidden></span></button>
+              <button type="button" data-v="cosmetics" aria-pressed="false">Cosmetics</button>
+              <button type="button" data-v="more" aria-pressed="false">More<span class="badge" id="bs-more" hidden></span></button>
+            </div>
+            <div class="sect" data-bview="relocate">
               <h2>Relocate</h2>
               <p class="note" id="beltname"></p>
               <p class="note">Leave this belt for a richer one. Every survey point permanently adds 10% to all your output and taps.</p>
@@ -123,17 +128,18 @@
               </div>
               <button class="btn primary" id="relocate" type="button" disabled>Relocate</button>
             </div>
-            <div class="sect">
-              <div class="row"><h2>Cosmetics</h2><span class="label">Survey points to spend <span class="pts" id="skin-pts">0</span></span></div>
+            <div class="sect" data-bview="cosmetics" hidden>
+              <h2>Cosmetics</h2>
+              <div class="row"><span class="label">Survey points to spend</span><span class="pts" id="skin-pts">0</span></div>
               <p class="note" id="skin-note"></p>
               <div id="skins"></div>
             </div>
-            <div class="sect">
+            <div class="sect" data-bview="more" hidden>
               <h2>Captain's journal</h2>
               <p class="note" id="jnote"></p>
               <button class="btn" id="journal-open" type="button">Read the journal <span class="newpill" id="jnew" hidden>New</span></button>
             </div>
-            <div class="sect">
+            <div class="sect" data-bview="more" hidden>
               <h2>Logbook</h2>
               <dl class="stats">
                 <dt>Lifetime ore</dt><dd id="st-all">0 t</dd>
@@ -151,7 +157,7 @@
                 <dt>Rank</dt><dd id="st-rank">Rookie</dd>
               </dl>
             </div>
-            <div class="sect">
+            <div class="sect" data-bview="more" hidden>
               <h2>Settings</h2>
               <div class="row"><span>Sound effects</span><button class="btn" id="snd" type="button" aria-pressed="true">On</button></div>
               <div class="row"><span>Music</span><button class="btn" id="mus" type="button" aria-pressed="true">On</button></div>
