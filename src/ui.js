@@ -149,6 +149,7 @@ export function createUI(h) {
   const tutorialOpen = () => !$('tutor').hidden;
   function renderTutorial() {
     const t = TUTORIAL[tutStep], last = tutStep === TUTORIAL.length - 1;
+    setText($('tut-kicker'), tutStep === 0 ? 'Welcome to the Drift' : "Captain's orders");
     $('tut-ico').innerHTML = icon(t.icon, 38);
     setText($('tut-title'), t.title); setText($('tut-text'), t.text);
     $('tut-dots').querySelectorAll('span').forEach((d, i) => d.classList.toggle('on', i === tutStep));

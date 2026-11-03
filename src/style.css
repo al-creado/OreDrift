@@ -186,6 +186,7 @@ canvas { display: block; width: 100%; height: 100%; touch-action: none; outline-
 .card.ach.mystery .count { color: var(--ore); font-size: 1.4rem; }
 .earned { margin: 6px 0 0; color: var(--muted); font: 500 .72rem/1.5 var(--f-mono); }
 .tutor .sect { text-align: center; justify-items: center; }
+.tut-kicker { color: var(--ore); font: 700 .7rem/1 var(--f-display); letter-spacing: .22em; text-transform: uppercase; }
 .tut-ico { display: grid; place-items: center; width: 72px; height: 72px; border-radius: 50%; background: var(--ink); border: 1px solid var(--ore-deep); color: var(--ore); }
 .tut-ico .ico { width: 38px; height: 38px; }
 .tutor .note { font-size: 1rem; color: var(--text); }
