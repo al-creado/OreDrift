@@ -233,21 +233,35 @@ describe('survey points and relocate', () => {
     expect(L.nextPointAt(state({ total: 1e6 }))).toBe(4e6);
     expect(L.nextPointAt(state({ total: 0 }))).toBe(1e6);
   });
+  it('points get dearer the more you hold, so relocating cannot be spammed', () => {
+    expect(L.pointCost(state({ points: 0 }))).toBe(1e6);
+    expect(L.pointCost(state({ points: 10 }))).toBeCloseTo(8e6, 3);        // (1 + 10/10)^3
+    expect(L.pointCost(state({ points: 99 }))).toBeCloseTo(1e6 * 10.9 ** 3, 0);
+    // with 10 points a run that mined 1M earns nothing now; it needs 8M for the first point
+    expect(L.prestigeGain(state({ points: 10, total: 1e6 }))).toBe(0);
+    expect(L.prestigeGain(state({ points: 10, total: 8e6 }))).toBe(1);
+    expect(L.prestigeGain(state({ points: 10, total: 32e6 }))).toBe(2);
+    expect(L.nextPointAt(state({ points: 10, total: 8e6 }))).toBe(32e6);
+    const pv = L.relocatePreview(state({ points: 10, total: 8e6 }));
+    expect(pv.gain).toBe(1); expect(pv.nextAt).toBe(32e6); expect(pv.progress).toBe(0);
+  });
 
   it('previews what relocating would do without changing anything', () => {
-    const S = state({ points: 2, total: 6.5e6, ore: 1234, owned: { drone: 3, laser: 4 }, ups: { bits: true, tune1: true } });
+    const cost = 1e6 * 1.2 ** 3; // 2 points held -> each new point costs 1.728M
+    const S = state({ points: 2, total: 8e6, ore: 1234, owned: { drone: 3, laser: 4 }, ups: { bits: true, tune1: true } });
     const before = JSON.stringify(S);
     const p = L.relocatePreview(S);
     expect(JSON.stringify(S)).toBe(before);
     expect(p.gain).toBe(2);
-    expect(p).toMatchObject({ pointsBefore: 2, pointsAfter: 4, nextAt: 9e6 });
+    expect(p).toMatchObject({ pointsBefore: 2, pointsAfter: 4 });
+    expect(p.nextAt).toBeCloseTo(9 * cost, 3);
     expect(p.surveyBefore).toBeCloseTo(0.2, 9);
     expect(p.surveyAfter).toBeCloseTo(0.4, 9);
     expect(p.bonusBefore).toBeCloseTo(0.2, 9);
     expect(p.bonusAfter).toBeCloseTo(0.4, 9);
     expect(p.ratio).toBeCloseTo(1.4 / 1.2, 9);
-    expect(p.progress).toBeCloseTo((6.5e6 - 4e6) / 5e6, 9);
-    expect(p.lose).toEqual({ ore: 1234, vessels: 7, upgrades: 2, run: 6.5e6 });
+    expect(p.progress).toBeCloseTo((8e6 - 4 * cost) / (5 * cost), 9);
+    expect(p.lose).toEqual({ ore: 1234, vessels: 7, upgrades: 2, run: 8e6 });
   });
 
   it('the preview matches what relocating really gives', () => {
@@ -270,7 +284,7 @@ describe('survey points and relocate', () => {
   });
 
   it('includes commendations and the shop boost in the total bonus', () => {
-    const S = state({ points: 1, total: 1e6, ach: { t1: true, sh1: true }, iap: { removeAds: false, starter: false, boost: true } });
+    const S = state({ points: 1, total: 2e6, ach: { t1: true, sh1: true }, iap: { removeAds: false, starter: false, boost: true } });
     const p = L.relocatePreview(S);
     const other = 1.015 * 1.25;
     expect(p.bonusBefore).toBeCloseTo(1.1 * other - 1, 9);
@@ -286,7 +300,7 @@ describe('survey points and relocate', () => {
 
   it('resets the run and keeps permanent progress', () => {
     const S = state({
-      ore: 1e6, total: 9e6, allTime: 5e7, taps: 123, points: 2, runs: 1,
+      ore: 1e6, total: 16e6, allTime: 5e7, taps: 123, points: 2, runs: 1,
       owned: { drone: 40 }, ups: { bits: true }, sound: false, streak: 4, lastSupply: '2026-01-02',
       frenzyUntil: NOW + 1000,
     });

@@ -5,6 +5,10 @@ export const MILESTONES = [10, 25, 50, 100, 150, 200];
 export const OFFLINE_CAP = 8 * 3600;
 export const OFFLINE_RATE = 0.5;
 export const PRESTIGE_BASE = 1e6;
+/* Each survey point you hold makes the next ones dearer, so a stronger fleet cannot spam relocations:
+   one point costs PRESTIGE_BASE * (1 + points / PRESTIGE_GROWTH_DIV) ^ PRESTIGE_GROWTH_POW ore in a run. */
+export const PRESTIGE_GROWTH_DIV = 10;
+export const PRESTIGE_GROWTH_POW = 3;
 export const FRENZY_MULT = 7;
 export const FRENZY_MAX_MS = 120000;
 export const ACH_BONUS = 0.01;

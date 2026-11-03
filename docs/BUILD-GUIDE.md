@@ -144,11 +144,11 @@ Show a toast: "Away 3 h 12 m. Your fleet mined +X t at half rate." Add "(capped 
 
 ### 3.6 Relocate (prestige)
 
-- Survey points gained now: `floor(sqrt(totalMinedThisRun / 1,000,000))`.
+- Survey points gained now: `floor(sqrt(totalMinedThisRun / pointCost))`, where `pointCost = 1,000,000 * (1 + pointsHeld / 10) ^ 3`. Holding more points makes the next ones dearer, so a stronger fleet cannot spam relocations.
 - Relocate needs at least 1 point. It requires a second tap to confirm ("Tap again to relocate", resets after 4 seconds).
 - It resets: ore, this-run total, vessels, upgrades. It keeps: survey points, lifetime ore, taps, relocation count, commendations, missions, streak, stats, sound setting.
 - Each point adds +10% to all vessel output and taps.
-- The Belt tab shows how much more ore the next point needs: `(points+1)^2 * 1,000,000`.
+- The Belt tab shows how much more ore the next point needs: `(gain+1)^2 * pointCost`.
 
 ### 3.7 Frenzy
 

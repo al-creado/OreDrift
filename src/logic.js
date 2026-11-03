@@ -4,7 +4,7 @@
  * Mutating functions say so and return plain results the UI turns into toasts and sounds.
  */
 import {
-  GENS, UPS, ACHS, MILESTONES, GROWTH, OFFLINE_CAP, OFFLINE_RATE, PRESTIGE_BASE,
+  GENS, UPS, ACHS, MILESTONES, GROWTH, OFFLINE_CAP, OFFLINE_RATE, PRESTIGE_BASE, PRESTIGE_GROWTH_DIV, PRESTIGE_GROWTH_POW,
   FRENZY_MULT, FRENZY_MAX_MS, SKINS, ACH_BONUS, ACH_GIFT, RANKS, CHAIN_TITLES, JOURNAL, SURVEY_BONUS, MAX_BUY, MISSION_TYPES, TAP_TARGETS,
   PRODUCTS, BOOST_MULT, GRANTED_KEEP,
 } from './data.js';
@@ -202,8 +202,10 @@ export function trackPlay(S, sec) {
 }
 
 /* ---------- relocate ---------- */
-export const prestigeGain = (S) => Math.floor(Math.sqrt(S.total / PRESTIGE_BASE));
-export const nextPointAt = (S) => Math.pow(prestigeGain(S) + 1, 2) * PRESTIGE_BASE;
+/** Ore in one run that earns the first survey point. It grows with the points already held. */
+export const pointCost = (S) => PRESTIGE_BASE * Math.pow(1 + S.points / PRESTIGE_GROWTH_DIV, PRESTIGE_GROWTH_POW);
+export const prestigeGain = (S) => Math.floor(Math.sqrt(S.total / pointCost(S)));
+export const nextPointAt = (S) => Math.pow(prestigeGain(S) + 1, 2) * pointCost(S);
 
 /**
  * What relocating right now would do, for the Belt tab. Does not change S.
@@ -211,7 +213,7 @@ export const nextPointAt = (S) => Math.pow(prestigeGain(S) + 1, 2) * PRESTIGE_BA
  */
 export function relocatePreview(S) {
   const gain = prestigeGain(S);
-  const lower = gain * gain * PRESTIGE_BASE, upper = (gain + 1) * (gain + 1) * PRESTIGE_BASE;
+  const cost = pointCost(S), lower = gain * gain * cost, upper = (gain + 1) * (gain + 1) * cost;
   const other = achMult(S) * iapMult(S);
   const before = surveyMult(S) * other, after = (1 + SURVEY_BONUS * (S.points + gain)) * other;
   return {
