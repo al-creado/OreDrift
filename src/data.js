@@ -211,6 +211,42 @@ export const PRODUCTS = [
 ];
 export const GRANTED_KEEP = 50;
 
+/*
+ * Cosmetic skins, bought with spare survey points. They change how the game looks and nothing else: the survey
+ * bonus keeps counting every point ever earned, and spending only moves points from "to spend" to "spent".
+ * slot: where it applies. rock skins either borrow a belt's colour scheme (belt: index into BELTS) or bring their own.
+ * An empty look id ('') is the default for that slot.
+ */
+export const SKIN_SLOTS = [
+  { id: 'rock', name: 'Asteroid', note: 'Recolours the rock and its glowing veins. The shape still follows your belt.' },
+  { id: 'fleet', name: 'Fleet paint', note: 'The hull colours of your orbiting vessels.' },
+  { id: 'sky', name: 'Sky', note: 'The stars and the glow behind the asteroid.' },
+];
+export const SKINS = [
+  { id: 'rock_rust', slot: 'rock', name: 'Rust Drift', cost: 2, belt: 1 },
+  { id: 'rock_glacier', slot: 'rock', name: 'Glacier Field', cost: 2, belt: 2 },
+  { id: 'rock_verdant', slot: 'rock', name: 'Verdant Shoal', cost: 2, belt: 3 },
+  { id: 'rock_violet', slot: 'rock', name: 'Violet Veil', cost: 2, belt: 4 },
+  { id: 'rock_ember', slot: 'rock', name: 'Ember Belt', cost: 2, belt: 5 },
+  { id: 'rock_bone', slot: 'rock', name: 'Bone Yard', cost: 2, belt: 6 },
+  { id: 'rock_obsidian', slot: 'rock', name: 'Obsidian Deep', cost: 2, belt: 7 },
+  { id: 'rock_gilded', slot: 'rock', name: 'Gilded', cost: 6, colors: { rock: '#3a3224', light: '#c9a45a', vein: '#ffe27a', veinHi: '#fff7d1' } },
+  { id: 'rock_neon', slot: 'rock', name: 'Neon Core', cost: 6, colors: { rock: '#1c1f2e', light: '#4a4f77', vein: '#39ffb6', veinHi: '#d6fff0' } },
+  { id: 'rock_quartz', slot: 'rock', name: 'Rose Quartz', cost: 6, colors: { rock: '#6b4a5e', light: '#e0a9c4', vein: '#ffb3d9', veinHi: '#fff0f8' } },
+  { id: 'rock_void', slot: 'rock', name: 'Void', cost: 6, colors: { rock: '#15151f', light: '#3b3b52', vein: '#b388ff', veinHi: '#ece0ff' } },
+
+  { id: 'fleet_midnight', slot: 'fleet', name: 'Midnight', cost: 4, paint: { hull: '#8f9bc9', mid: '#4d5a8f', dark: '#232a4d' } },
+  { id: 'fleet_copper', slot: 'fleet', name: 'Copper', cost: 4, paint: { hull: '#f0c9a0', mid: '#c98a56', dark: '#7a4a2a' } },
+  { id: 'fleet_emerald', slot: 'fleet', name: 'Emerald', cost: 4, paint: { hull: '#c7f0d4', mid: '#6fbf8d', dark: '#2f6b4a' } },
+  { id: 'fleet_crimson', slot: 'fleet', name: 'Crimson', cost: 6, paint: { hull: '#f2c2c2', mid: '#d36a6a', dark: '#7a2a2a' } },
+  { id: 'fleet_gold', slot: 'fleet', name: 'Gold fleet', cost: 10, paint: { hull: '#fff0b8', mid: '#e0b84a', dark: '#8a6a1a' } },
+
+  { id: 'sky_warm', slot: 'sky', name: 'Warm stars', cost: 3, sky: { star: '#ffe9c4' } },
+  { id: 'sky_aurora', slot: 'sky', name: 'Aurora', cost: 6, sky: { star: '#c9fff0', nebula: '#2bd9a3' } },
+  { id: 'sky_nebula', slot: 'sky', name: 'Violet nebula', cost: 6, sky: { star: '#f0d6ff', nebula: '#9b5de5' } },
+  { id: 'sky_deep', slot: 'sky', name: 'Deep blue', cost: 6, sky: { star: '#d6e8ff', nebula: '#3a6fff' } },
+];
+
 
 /*
  * The Captain's journal: a story told in chapters that unlock with lifetime progress.

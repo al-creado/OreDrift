@@ -20,6 +20,9 @@ export const BELTS = [
   { name: 'Obsidian Deep', rock: '#2b3045', light: '#5a6590', vein: '#ffd24a', veinHi: '#fff3b0' },
 ];
 
+/** Colours of a rock skin: its own, or those of the belt scheme it borrows. */
+export const skinRockColors = (skin) => (skin.colors || BELTS[skin.belt]);
+
 /** Shape parameters of the original asteroid. Belt 0 must keep looking exactly like this. */
 const ORIGINAL = { n: 16, base: 0.8, amp: 0.2, craters: 5, veins: 6, segs: 4 };
 

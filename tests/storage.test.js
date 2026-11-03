@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { parseSave, serializeState } from '../src/storage.js';
 import { fresh } from '../src/logic.js';
+import { SKINS } from '../src/data.js';
 
 const NOW = 2_000_000_000_000;
 const goodSave = () => ({
@@ -107,6 +108,17 @@ describe('parseSave', () => {
     expect(parse({ ...goodSave(), weekly: { ...wk, missions: [wk.missions[0], wk.missions[1], { type: 'warp', target: 5 }] } }).weekly).toBeNull();
     expect(parse({ ...goodSave(), weekly: { ...wk, week: 'monday' } }).weekly).toBeNull();
     expect(parse({ ...goodSave(), weekly: 'x' }).weekly).toBeNull();
+  });
+
+  it('skins: spent is capped at points earned, and only owned skins of the right slot can be worn', () => {
+    const rockId = SKINS.find((k) => k.slot === 'rock').id, fleetId = SKINS.find((k) => k.slot === 'fleet').id;
+    const S = parse({ ...goodSave(), points: 3, spent: 99, skins: { [rockId]: true, ghost: true }, look: { rock: rockId, fleet: fleetId, sky: 'ghost' } });
+    expect(S.spent).toBe(3);
+    expect(S.skins).toEqual({ [rockId]: true });
+    expect(S.look).toEqual({ rock: rockId, fleet: '', sky: '' }); // fleet skin is not owned, sky is unknown
+    const old = parse(goodSave());
+    expect(old.spent).toBe(0); expect(old.skins).toEqual({}); expect(old.look).toEqual({ rock: '', fleet: '', sky: '' });
+    expect(parse(serializeState(S, NOW))).toEqual({ ...S, last: NOW });
   });
 
   it('wrong container types are ignored, not fatal', () => {

@@ -1,7 +1,7 @@
 /* DOM building and updating: HUD, tabs, cards, goals, toasts. Reads state, never changes rules. */
-import { GENS, UPS, ACHS, MILESTONES, FRENZY_MULT, PRODUCTS, ACH_GROUPS, TIER_NAMES, RANKS, JOURNAL } from './data.js';
+import { GENS, UPS, ACHS, MILESTONES, FRENZY_MULT, PRODUCTS, ACH_GROUPS, TIER_NAMES, RANKS, JOURNAL, SKINS, SKIN_SLOTS } from './data.js';
 import * as L from './logic.js';
-import { beltFor } from './belts.js';
+import { beltFor, skinRockColors } from './belts.js';
 
 const $ = (id) => document.getElementById(id);
 const setText = (el, s) => { if (el.textContent !== s) el.textContent = s; };
@@ -229,11 +229,52 @@ export function createUI(h) {
   }
   const resetUpgradeList = () => { upKey = ''; };
 
+  /* ---------- cosmetics: skins bought with spare survey points ---------- */
+  const skinEls = [];
+  const swatch = (k) => {
+    if (!k) return '#464c68'; // the default look
+    if (k.slot === 'rock') { const c = skinRockColors(k); return 'linear-gradient(135deg, ' + c.rock + ' 50%, ' + c.vein + ' 50%)'; }
+    if (k.slot === 'fleet') return 'linear-gradient(135deg, ' + k.paint.hull + ' 50%, ' + k.paint.mid + ' 50%)';
+    return 'linear-gradient(135deg, ' + (k.sky.nebula || '#0b1020') + ' 50%, ' + k.sky.star + ' 50%)';
+  };
+  function buildSkins() {
+    const host = $('skins'); host.textContent = ''; skinEls.length = 0;
+    SKIN_SLOTS.forEach((slot) => {
+      const g = document.createElement('h3'); g.className = 'grp'; g.textContent = slot.name; host.appendChild(g);
+      const n = document.createElement('p'); n.className = 'note'; n.textContent = slot.note; host.appendChild(n);
+      const list = document.createElement('div'); list.className = 'skinlist'; host.appendChild(list);
+      const defaults = { id: '', slot: slot.id, name: slot.id === 'rock' ? 'Belt colours' : 'Standard', cost: 0, meta: slot.id === 'rock' ? 'Changes with each belt.' : 'The original look.' };
+      [defaults, ...SKINS.filter((k) => k.slot === slot.id)].forEach((k) => {
+        const el = document.createElement('article'); el.className = 'card up';
+        el.innerHTML = '<div class="info"><h3 class="name"><span class="sw"></span><span class="nm"></span></h3><p class="meta"></p></div><button class="buy" type="button"><span class="bn"></span><span class="bc"></span></button>';
+        el.querySelector('.sw').style.background = swatch(k.id ? k : null);
+        el.querySelector('.nm').textContent = k.name;
+        const c = { skin: k, meta: el.querySelector('.meta'), btn: el.querySelector('.buy'), bn: el.querySelector('.bn'), bc: el.querySelector('.bc') };
+        c.btn.addEventListener('click', () => { if (!k.id || L.owns_skin(S(), k.id)) h.onWearSkin(slot.id, k.id); else h.onBuySkin(k.id); });
+        list.appendChild(el); skinEls.push(c);
+      });
+    });
+  }
+  function updateSkins(s) {
+    const spare = L.spendablePoints(s);
+    setText($('skin-pts'), String(spare));
+    setText($('skin-note'), 'Skins only change how the game looks. Spending survey points on them never lowers your bonus, and every point still counts for output.');
+    skinEls.forEach((c) => {
+      const k = c.skin, worn = k.id ? L.wornSkin(s, k.slot) === k : !L.wornSkin(s, k.slot);
+      const owned = !k.id || L.owns_skin(s, k.id);
+      setText(c.meta, owned ? (k.meta || 'Owned') : 'Costs ' + k.cost + ' survey point' + (k.cost === 1 ? '' : 's'));
+      if (worn) setBtn(c, false, 'Worn', '');
+      else if (owned) setBtn(c, true, 'Wear', '');
+      else setBtn(c, spare >= k.cost, 'Buy', k.cost + ' pt' + (k.cost === 1 ? '' : 's'));
+    });
+  }
+
   /* ---------- belt ---------- */
   function updateBelt(s) {
     if (activeTab !== 'belt') return;
     const pv = L.relocatePreview(s), g = pv.gain;
     setText($('pts'), String(s.points));
+    updateSkins(s);
     const chapters = L.journalCount(s);
     setText($('jnote'), chapters + ' of ' + JOURNAL.length + ' chapters unlocked. A story of the Drift, told as you go.');
     $('jnew').hidden = chapters <= s.journalSeen;
@@ -607,7 +648,7 @@ export function createUI(h) {
   }
 
   function init() {
-    buildFleet(); buildGoals(); buildShop();
+    buildFleet(); buildGoals(); buildShop(); buildSkins();
     document.querySelectorAll('#seg button').forEach((b) => b.addEventListener('click', () => {
       buyMode = b.dataset.m === 'max' ? 'max' : +b.dataset.m;
       document.querySelectorAll('#seg button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));

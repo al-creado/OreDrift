@@ -5,7 +5,7 @@
  */
 import {
   GENS, UPS, ACHS, MILESTONES, GROWTH, OFFLINE_CAP, OFFLINE_RATE, PRESTIGE_BASE,
-  FRENZY_MULT, FRENZY_MAX_MS, ACH_BONUS, ACH_GIFT, RANKS, CHAIN_TITLES, JOURNAL, SURVEY_BONUS, MAX_BUY, MISSION_TYPES, TAP_TARGETS,
+  FRENZY_MULT, FRENZY_MAX_MS, SKINS, ACH_BONUS, ACH_GIFT, RANKS, CHAIN_TITLES, JOURNAL, SURVEY_BONUS, MAX_BUY, MISSION_TYPES, TAP_TARGETS,
   PRODUCTS, BOOST_MULT, GRANTED_KEEP,
 } from './data.js';
 
@@ -64,6 +64,7 @@ export function fresh(now = 0) {
     streak: 0, lastSupply: '', daily: null, weekly: null, frenzyUntil: 0, notify: false, podReadyAt: 0,
     iap: { removeAds: false, starter: false, boost: false }, granted: [], journalSeen: 0,
     gifts: {}, // commendation id -> ore gift waiting to be claimed
+    spent: 0, skins: {}, look: { rock: '', fleet: '', sky: '' }, // cosmetics: survey points spent, skins owned, skin worn per slot
   };
 }
 
@@ -232,6 +233,32 @@ export function relocate(S) {
   S.points += g; S.runs++;
   S.ore = 0; S.total = 0; S.owned = {}; S.ups = {};
   return g;
+}
+
+/* ---------- cosmetic skins ---------- */
+export const skinById = (id) => SKINS.find((k) => k.id === id) || null;
+/** Survey points free to spend. The survey bonus itself always uses S.points, so spending never lowers it. */
+export const spendablePoints = (S) => Math.max(0, S.points - S.spent);
+export const owns_skin = (S, id) => S.skins[id] === true;
+/** The skin worn in a slot, or null for the default look. */
+export const wornSkin = (S, slot) => {
+  const k = skinById(S.look[slot]);
+  return k && k.slot === slot && S.skins[k.id] ? k : null;
+};
+/** Buys a skin with spare survey points and wears it. Mutates S. Returns false when refused. */
+export function buySkin(S, id) {
+  const k = skinById(id);
+  if (!k || S.skins[id] || spendablePoints(S) < k.cost) return false;
+  S.spent += k.cost; S.skins[id] = true; S.look[k.slot] = id;
+  return true;
+}
+/** Wears an owned skin, or the default look for a slot when id is '' (pass the slot then). Mutates S. */
+export function wearSkin(S, slot, id) {
+  if (id === '') { S.look[slot] = ''; return true; }
+  const k = skinById(id);
+  if (!k || k.slot !== slot || !S.skins[id]) return false;
+  S.look[slot] = id;
+  return true;
 }
 
 /* ---------- commendations ---------- */

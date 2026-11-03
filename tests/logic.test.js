@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { GENS, UPS, ACHS, PRODUCTS, ACH_GROUPS, RANKS, JOURNAL } from '../src/data.js';
+import { GENS, UPS, ACHS, PRODUCTS, ACH_GROUPS, RANKS, JOURNAL, SKINS } from '../src/data.js';
 import * as L from '../src/logic.js';
 import { simulate } from './sim.js';
 
@@ -1561,10 +1561,53 @@ describe('shop', () => {
 });
 
 describe('save-shape defaults', () => {
+  describe('cosmetic skins', () => {
+    const rock = () => SKINS.find((k) => k.slot === 'rock' && k.cost === 2), pricey = () => SKINS.find((k) => k.cost >= 10);
+    it('buying spends spare points, wears the skin, and cannot go below zero', () => {
+      const S = state({ points: 3 });
+      expect(L.spendablePoints(S)).toBe(3);
+      expect(L.buySkin(S, rock().id)).toBe(true);
+      expect(S.spent).toBe(2); expect(L.spendablePoints(S)).toBe(1);
+      expect(L.wornSkin(S, 'rock').id).toBe(rock().id);
+      expect(L.buySkin(S, rock().id)).toBe(false);   // already owned
+      expect(L.buySkin(S, pricey().id)).toBe(false); // cannot afford it
+      expect(S.spent).toBe(2);
+      expect(L.buySkin(S, 'nope')).toBe(false);
+    });
+    it('is purely cosmetic: spending points never changes output or the survey bonus', () => {
+      const S = state({ points: 12, owned: { laser: 10 } });
+      const before = { ops: L.ops(S), tap: L.tapValue(S, 0, L.ops(S)), mult: L.surveyMult(S), prev: L.relocatePreview(S).bonusBefore };
+      L.buySkin(S, rock().id); L.buySkin(S, pricey().id);
+      expect(S.spent).toBeGreaterThan(0);
+      expect(L.ops(S)).toBe(before.ops);
+      expect(L.tapValue(S, 0, L.ops(S))).toBe(before.tap);
+      expect(L.surveyMult(S)).toBe(before.mult);
+      expect(L.relocatePreview(S).bonusBefore).toBe(before.prev);
+    });
+    it('wearing needs an owned skin of the right slot, and an empty id restores the default', () => {
+      const S = state({ points: 5 }), r = rock(), f = SKINS.find((k) => k.slot === 'fleet');
+      expect(L.wearSkin(S, 'rock', r.id)).toBe(false); // not owned yet
+      L.buySkin(S, r.id);
+      expect(L.wearSkin(S, 'fleet', r.id)).toBe(false); // wrong slot
+      expect(L.wearSkin(S, 'rock', '')).toBe(true);
+      expect(L.wornSkin(S, 'rock')).toBe(null);
+      expect(L.wearSkin(S, 'rock', r.id)).toBe(true);
+      expect(f).toBeTruthy();
+    });
+    it('survives relocating, and new points can be spent', () => {
+      const S = state({ points: 2, total: 5e6 });
+      L.buySkin(S, rock().id);
+      const gained = L.relocate(S);
+      expect(gained).toBeGreaterThan(0);
+      expect(S.skins[rock().id]).toBe(true); expect(S.spent).toBe(2);
+      expect(L.spendablePoints(S)).toBe(gained);
+    });
+  });
+
   it('fresh state has the documented fields', () => {
     const S = L.fresh(42);
     expect(Object.keys(S).sort()).toEqual(['ach', 'allTime', 'daily', 'frenzyUntil', 'gifts', 'haptics', 'last', 'lastSupply', 'owned',
-      'granted', 'iap', 'journalSeen', 'music', 'notify', 'podReadyAt', 'points', 'ore', 'runs', 'sound', 'stats', 'streak', 'taps', 'total', 'ups', 'weekly'].sort());
+      'granted', 'iap', 'journalSeen', 'music', 'notify', 'podReadyAt', 'points', 'ore', 'runs', 'skins', 'look', 'spent', 'sound', 'stats', 'streak', 'taps', 'total', 'ups', 'weekly'].sort());
     expect(S.last).toBe(42);
     expect(S.sound).toBe(true);
   });

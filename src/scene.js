@@ -1,7 +1,7 @@
 /* Canvas scene: the belt's asteroid, stars, orbiting ships, comet, particles, floating text. */
 import { fmt, FIRST_COMET_MS, cometDelayMs, pickFlyer } from './logic.js';
-import { GENS } from './data.js';
-import { beltFor, allocateShips } from './belts.js';
+import { GENS, SKINS } from './data.js';
+import { beltFor, allocateShips, skinRockColors } from './belts.js';
 import { drawShip, SHIP_SCALE } from './ships.js';
 
 const flyerRate = (hooks) => (hooks.flyerRate ? hooks.flyerRate() : 1);
@@ -15,7 +15,7 @@ const SHIP_COLOR = '#7fe3ff'; // supply ships glow cyan, comets glow orange, so 
 const VESSEL_IDS = GENS.map((g) => g.id);
 
 /**
- * hooks: { reduced: bool, frenzyOn(): bool, fleet(): { vesselId: count }, belt(): relocation count,
+ * hooks: { look?(): the skin worn per slot, reduced: bool, frenzyOn(): bool, fleet(): { vesselId: count }, belt(): relocation count,
  *          flyerRate?(): how many times as often flyers come (an event), onCometSpawn?(kind), onCometPing?(kind), onCometMissed?() }  kind is 'ship' (supply ship) or 'comet'
  * Returns the scene controller.
  */
@@ -33,10 +33,18 @@ export function createScene(cv, hooks) {
   const fx = { chips: [], texts: [] };
 
   /* ---- the current belt: shape, colours and ring change with every relocation ---- */
-  let curRuns = -1, B = beltFor(0);
+  let curKey = '', B = beltFor(0), paint = null, sky = null;
+  const skinOf = (id) => SKINS.find((k) => k.id === id) || null;
   function syncBelt() {
-    const runs = hooks.belt();
-    if (runs !== curRuns) { curRuns = runs; B = beltFor(runs); }
+    const runs = hooks.belt(), look = hooks.look ? hooks.look() : {};
+    const key = runs + '|' + (look.rock || '') + '|' + (look.fleet || '') + '|' + (look.sky || '');
+    if (key === curKey) return;
+    curKey = key;
+    B = beltFor(runs);
+    const rock = skinOf(look.rock);
+    if (rock) B = { ...B, ...skinRockColors(rock) }; // a rock skin recolours the belt; the shape stays
+    paint = (skinOf(look.fleet) || {}).paint || null;
+    sky = (skinOf(look.sky) || {}).sky || null;
   }
   const mid = (a, b) => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
   function rockPath(c) {
@@ -148,10 +156,15 @@ export function createScene(cv, hooks) {
     syncBelt();
     tClock += dt;
     ctx.clearRect(0, 0, W, H);
+    if (sky && sky.nebula) {
+      const ng = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, Math.max(W, H) * 0.7);
+      ng.addColorStop(0, sky.nebula + '3a'); ng.addColorStop(1, sky.nebula + '00');
+      ctx.fillStyle = ng; ctx.fillRect(0, 0, W, H);
+    }
     for (const s of stars) {
       s.x -= s.sp * dt; if (s.x < 0) s.x += 1;
       ctx.globalAlpha = Math.max(0.1, 0.35 + 0.45 * Math.sin(tClock * s.tw + s.ph));
-      ctx.fillStyle = STAR; ctx.beginPath(); ctx.arc(s.x * W, s.y * H, s.s, 0, TAU); ctx.fill();
+      ctx.fillStyle = (sky && sky.star) || STAR; ctx.beginPath(); ctx.arc(s.x * W, s.y * H, s.s, 0, TAU); ctx.fill();
     }
     ctx.globalAlpha = 1;
     const cx = W / 2, cy = H / 2 + 2, base = Math.min(W * 0.42, H * 0.36);
@@ -195,7 +208,7 @@ export function createScene(cv, hooks) {
       }
       const k = k0 * (SHIP_SCALE[ships[i]] || 1);
       ctx.save(); ctx.translate(x, y); ctx.rotate(h); ctx.scale(k, k);
-      drawShip(ctx, ships[i], { glow: B.vein, t: tClock + i, reduced: REDUCED });
+      drawShip(ctx, ships[i], { glow: B.vein, t: tClock + i, reduced: REDUCED, paint });
       ctx.restore();
     }
 

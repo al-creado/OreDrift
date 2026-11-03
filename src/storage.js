@@ -4,7 +4,7 @@
  */
 import { Capacitor } from '@capacitor/core';
 import { Preferences } from '@capacitor/preferences';
-import { GENS, UPS, ACHS, MISSION_TYPES, GRANTED_KEEP, JOURNAL } from './data.js';
+import { GENS, UPS, ACHS, MISSION_TYPES, GRANTED_KEEP, JOURNAL, SKINS } from './data.js';
 import { fresh, WEEKLY_TYPES } from './logic.js';
 
 export const SAVE_KEY = 'oredrift.v1';
@@ -51,6 +51,14 @@ export function parseSave(raw, now = Date.now()) {
   for (const u of UPS) if (ups[u.id] === true) S.ups[u.id] = true;
   const ach = isObj(d.ach) ? d.ach : {};
   for (const a of ACHS) if (ach[a.id] === true) S.ach[a.id] = true;
+  S.spent = Math.min(int(d.spent, 0), S.points); // can never have spent more than was earned
+  const skins = isObj(d.skins) ? d.skins : {};
+  for (const k of SKINS) if (skins[k.id] === true) S.skins[k.id] = true;
+  const look = isObj(d.look) ? d.look : {};
+  for (const slot of Object.keys(S.look)) {
+    const k = SKINS.find((x) => x.id === look[slot]);
+    if (k && k.slot === slot && S.skins[k.id]) S.look[slot] = k.id; // only an owned skin of the right slot can be worn
+  }
   const gifts = isObj(d.gifts) ? d.gifts : {};
   for (const a of ACHS) {
     const g = num(gifts[a.id], -1);

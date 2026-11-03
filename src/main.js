@@ -210,6 +210,20 @@ function onWipe() {
   if (shopOn()) syncPurchases(false); // purchases live with the Google account, so bring owned items (Remove ads, boost) straight back
 }
 
+function onBuySkin(id) {
+  const k = L.skinById(id);
+  if (!L.buySkin(S, id)) return;
+  sounds.buy();
+  ui.toast(k.name + ' unlocked and worn.');
+  refresh(); save();
+}
+
+function onWearSkin(slot, id) {
+  if (!L.wearSkin(S, slot, id)) return;
+  sounds.claim();
+  refresh(); save();
+}
+
 function onClaimMission(i) {
   const g = L.claimMission(S, i);
   if (!g) return;
@@ -401,7 +415,7 @@ async function boot() {
 
   ui = createUI({
     getState: () => S,
-    onBuy, onBuyUp, onClaimMission, onClaimWeekly, onSwapMission, onSwapWeekly, rewardsOpen, onClaimChest, onClaimSupply, onClaimAch, onRelocate, onWipe, onToggleSound, onToggleHaptics, onToggleMusic,
+    onBuy, onBuyUp, onClaimMission, onClaimWeekly, onSwapMission, onSwapWeekly, rewardsOpen, onClaimChest, onClaimSupply, onClaimAch, onBuySkin, onWearSkin, onRelocate, onWipe, onToggleSound, onToggleHaptics, onToggleMusic,
     onOpenJournal: () => { S.journalSeen = L.journalCount(S); save(); refresh(); },
     onToggleNotify: native.isNative() ? onToggleNotify : null,
     onRefresh: refresh,
@@ -419,6 +433,7 @@ async function boot() {
     flyerRate: () => L.flyerRate(new Date()),
     frenzyOn: () => L.frenzyOn(S, Date.now()),
     fleet: () => S.owned,
+    look: () => S.look,
     belt: () => S.runs,
     onCometSpawn: (kind) => (kind === 'ship' ? sounds.shipSpawn() : sounds.cometSpawn()),
     onCometPing: (kind) => (kind === 'ship' ? sounds.shipPing() : sounds.cometPing()),
