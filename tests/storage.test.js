@@ -121,6 +121,14 @@ describe('parseSave', () => {
     expect(parse(serializeState(S, NOW))).toEqual({ ...S, last: NOW });
   });
 
+  it('tutorial: new saves show it once; a save with any progress counts as seen', () => {
+    expect(parse({}).tutorial).toBe(false);
+    expect(parse({ tutorial: true }).tutorial).toBe(true);
+    expect(parse({ taps: 3 }).tutorial).toBe(true);
+    expect(parse({ allTime: 500 }).tutorial).toBe(true);
+    expect(fresh(NOW).tutorial).toBe(false);
+  });
+
   it('wrong container types are ignored, not fatal', () => {
     const S = parse({ ...goodSave(), owned: [1, 2], ups: 'x', ach: 5, stats: null, daily: 'x' });
     expect(S.owned).toEqual({});

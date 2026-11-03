@@ -2,6 +2,7 @@
 import { GENS, UPS, ACHS, MILESTONES, FRENZY_MULT, PRODUCTS, ACH_GROUPS, TIER_NAMES, RANKS, JOURNAL, SKINS, SKIN_SLOTS } from './data.js';
 import * as L from './logic.js';
 import { beltFor, skinRockColors } from './belts.js';
+import { icon } from './icons.js';
 
 const $ = (id) => document.getElementById(id);
 const setText = (el, s) => { if (el.textContent !== s) el.textContent = s; };
@@ -137,7 +138,38 @@ export function createUI(h) {
     $('welcome').hidden = true;
     return true;
   }
-  const closeOverlay = () => closeWelcome() || closeJournal();
+  /* ---------- how to play: four short steps ---------- */
+  const TUTORIAL = [
+    { icon: 'tap', title: 'Mine', text: 'Tap the asteroid to mine ore.' },
+    { icon: 'fleet', title: 'Hire', text: 'Spend ore on vessels in Fleet. They keep mining while you are away.' },
+    { icon: 'goals', title: 'Collect', text: 'Catch comets and ships. Claim daily rewards in Goals.' },
+    { icon: 'belt', title: 'Relocate', text: 'Reset in Belt for permanent bonuses and new skins.' },
+  ];
+  let tutStep = 0;
+  const tutorialOpen = () => !$('tutor').hidden;
+  function renderTutorial() {
+    const t = TUTORIAL[tutStep], last = tutStep === TUTORIAL.length - 1;
+    $('tut-ico').innerHTML = icon(t.icon, 38);
+    setText($('tut-title'), t.title); setText($('tut-text'), t.text);
+    $('tut-dots').querySelectorAll('span').forEach((d, i) => d.classList.toggle('on', i === tutStep));
+    setText($('tut-next'), last ? 'Start mining' : 'Next');
+    $('tut-skip').hidden = last;
+    $('tut-next').focus();
+  }
+  function showTutorial() {
+    tutStep = 0;
+    $('tut-dots').innerHTML = TUTORIAL.map(() => '<span></span>').join('');
+    $('tutor').hidden = false;
+    renderTutorial();
+  }
+  /** Returns true if the card was open (so the back button knows it handled the press). */
+  function closeTutorial() {
+    if (!tutorialOpen()) return false;
+    $('tutor').hidden = true;
+    h.onTutorialDone();
+    return true;
+  }
+  const closeOverlay = () => closeTutorial() || closeWelcome() || closeJournal();
 
   /* ---------- fleet ---------- */
   const cards = {};
@@ -684,6 +716,10 @@ export function createUI(h) {
       h.onRefresh();
     });
     $('journal-open').addEventListener('click', openJournal);
+    document.querySelectorAll('.nav button').forEach((b) => b.insertAdjacentHTML('afterbegin', icon(b.dataset.tab)));
+    $('tut-next').addEventListener('click', () => { if (tutStep < TUTORIAL.length - 1) { tutStep++; renderTutorial(); } else closeTutorial(); });
+    $('tut-skip').addEventListener('click', closeTutorial);
+    $('howto').addEventListener('click', showTutorial);
     document.querySelectorAll('#beltseg button').forEach((b) => b.addEventListener('click', () => {
       if (b.dataset.v === beltView) return;
       setBeltView(b.dataset.v); $('tab-belt').scrollTop = 0; // each view starts at the top
@@ -699,7 +735,7 @@ export function createUI(h) {
   }
 
   return {
-    init, update, updateOre, toast, achPop, closeJournal, closeOverlay, showWelcome, setWelcomeOffer, welcomeDoubled, welcomeOpen, showOffer, hideOffer, markNew, setShopVisible, setAdPrivacy: (on) => { $('adprivacy-row').hidden = !on; }, selectTab, resetUpgradeList, resetAchList,
+    init, update, updateOre, toast, achPop, closeJournal, closeOverlay, showTutorial, showWelcome, setWelcomeOffer, welcomeDoubled, welcomeOpen, showOffer, hideOffer, markNew, setShopVisible, setAdPrivacy: (on) => { $('adprivacy-row').hidden = !on; }, selectTab, resetUpgradeList, resetAchList,
     activeTab: () => activeTab,
   };
 }

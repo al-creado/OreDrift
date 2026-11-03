@@ -162,6 +162,7 @@
               <div class="row"><span>Sound effects</span><button class="btn" id="snd" type="button" aria-pressed="true">On</button></div>
               <div class="row"><span>Music</span><button class="btn" id="mus" type="button" aria-pressed="true">On</button></div>
               <div class="row"><span>Vibration</span><button class="btn" id="hap" type="button" aria-pressed="true">On</button></div>
+              <div class="row"><span>How to play</span><button class="btn" id="howto" type="button">Show</button></div>
               <div id="notify-row" class="row" hidden><span>Reminders</span><button class="btn" id="notify" type="button" aria-pressed="false">Off</button></div>
               <div id="adprivacy-row" class="row" hidden><span>Ad privacy choices</span><button class="btn" id="adprivacy" type="button">Open</button></div>
               <button class="btn danger" id="wipe" type="button">Wipe save</button>
@@ -176,11 +177,11 @@
       </main>
 
       <nav class="nav" role="tablist" aria-label="Sections">
-        <button type="button" role="tab" aria-selected="true" data-tab="fleet">Fleet</button>
-        <button type="button" role="tab" aria-selected="false" data-tab="ups">Upgrades<span class="badge" id="b-ups" hidden></span></button>
-        <button type="button" role="tab" aria-selected="false" data-tab="goals">Goals<span class="badge" id="b-goals" hidden></span></button>
-        <button type="button" role="tab" aria-selected="false" data-tab="belt">Belt<span class="badge" id="b-belt" hidden></span></button>
-        <button type="button" role="tab" aria-selected="false" data-tab="shop" id="nav-shop" hidden>Shop</button>
+        <button type="button" role="tab" aria-selected="true" data-tab="fleet" aria-label="Fleet" title="Fleet"></button>
+        <button type="button" role="tab" aria-selected="false" data-tab="ups" aria-label="Upgrades" title="Upgrades"><span class="badge" id="b-ups" hidden></span></button>
+        <button type="button" role="tab" aria-selected="false" data-tab="goals" aria-label="Goals" title="Goals"><span class="badge" id="b-goals" hidden></span></button>
+        <button type="button" role="tab" aria-selected="false" data-tab="belt" aria-label="Belt" title="Belt"><span class="badge" id="b-belt" hidden></span></button>
+        <button type="button" role="tab" aria-selected="false" data-tab="shop" id="nav-shop" aria-label="Shop" title="Shop" hidden></button>
       </nav>
     </div>
     <div class="journal" id="journal" role="dialog" aria-modal="true" aria-label="Captain's journal" hidden>
@@ -198,6 +199,18 @@
         <p class="note" id="wel-note"></p>
         <button class="btn primary" id="wel-double" type="button" hidden></button>
         <button class="btn" id="wel-ok" type="button">Continue</button>
+      </div>
+    </div>
+    <div class="welcome tutor" id="tutor" role="dialog" aria-modal="true" aria-labelledby="tut-title" hidden>
+      <div class="sect">
+        <div class="tut-ico" id="tut-ico"></div>
+        <h2 id="tut-title"></h2>
+        <p class="note" id="tut-text"></p>
+        <div class="tdots" id="tut-dots" aria-hidden="true"></div>
+        <div class="row">
+          <button class="btn" id="tut-skip" type="button">Skip</button>
+          <button class="btn primary" id="tut-next" type="button">Next</button>
+        </div>
       </div>
     </div>
     <div class="achpop" id="achpop" role="status" aria-live="polite" hidden>

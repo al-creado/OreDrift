@@ -51,6 +51,7 @@ export function parseSave(raw, now = Date.now()) {
   for (const u of UPS) if (ups[u.id] === true) S.ups[u.id] = true;
   const ach = isObj(d.ach) ? d.ach : {};
   for (const a of ACHS) if (ach[a.id] === true) S.ach[a.id] = true;
+  S.tutorial = d.tutorial === true || S.taps > 0 || S.allTime > 0; // a save with progress has already learned the game
   S.spent = Math.min(int(d.spent, 0), S.points); // can never have spent more than was earned
   const skins = isObj(d.skins) ? d.skins : {};
   for (const k of SKINS) if (skins[k.id] === true) S.skins[k.id] = true;

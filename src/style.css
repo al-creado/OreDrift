@@ -185,6 +185,15 @@ canvas { display: block; width: 100%; height: 100%; touch-action: none; outline-
 .card.ach.mystery { border-style: dashed; opacity: .75; }
 .card.ach.mystery .count { color: var(--ore); font-size: 1.4rem; }
 .earned { margin: 6px 0 0; color: var(--muted); font: 500 .72rem/1.5 var(--f-mono); }
+.tutor .sect { text-align: center; justify-items: center; }
+.tut-ico { display: grid; place-items: center; width: 72px; height: 72px; border-radius: 50%; background: var(--ink); border: 1px solid var(--ore-deep); color: var(--ore); }
+.tut-ico .ico { width: 38px; height: 38px; }
+.tutor .note { font-size: 1rem; color: var(--text); }
+.tutor .row { width: 100%; }
+.tutor .row .btn { flex: 1; }
+.tdots { display: flex; gap: 8px; }
+.tdots span { width: 8px; height: 8px; border-radius: 50%; background: var(--line); }
+.tdots span.on { background: var(--ore); }
 .beltseg { display: flex; }
 .beltseg button { position: relative; flex: 1; }
 .beltseg .badge { top: 8px; right: 10px; }
@@ -204,6 +213,8 @@ canvas { display: block; width: 100%; height: 100%; touch-action: none; outline-
 }
 .nav button { position: relative; min-height: 54px; padding: 0 2px; font: 700 .95rem var(--f-display); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
 .nav button[aria-selected="true"] { color: var(--ore); box-shadow: inset 0 2px 0 var(--ore); }
+.nav button .ico { display: block; margin: 0 auto; }
+.nav .badge { top: 10px; right: calc(50% - 18px); }
 .badge { position: absolute; top: 9px; right: 8px; width: 7px; height: 7px; border-radius: 50%; background: var(--ore); }
 #reset { white-space: nowrap; }
 .pod-wrap { padding-top: 8px; }

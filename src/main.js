@@ -198,6 +198,7 @@ function onRelocate() {
 
 function onWipe() {
   S = L.fresh(Date.now());
+  S.tutorial = true; // they know the game; no need to teach it again
   lastT = Date.now();
   ui.resetUpgradeList(); ui.resetAchList();
   scene.resetComet(Date.now());
@@ -208,6 +209,11 @@ function onWipe() {
   ui.toast('Save wiped. Fresh belt.');
   syncMusic();
   if (shopOn()) syncPurchases(false); // purchases live with the Google account, so bring owned items (Remove ads, boost) straight back
+}
+
+function onTutorialDone() {
+  if (S.tutorial) return;
+  S.tutorial = true; save();
 }
 
 function onBuySkin(id) {
@@ -415,7 +421,7 @@ async function boot() {
 
   ui = createUI({
     getState: () => S,
-    onBuy, onBuyUp, onClaimMission, onClaimWeekly, onSwapMission, onSwapWeekly, rewardsOpen, onClaimChest, onClaimSupply, onClaimAch, onBuySkin, onWearSkin, onRelocate, onWipe, onToggleSound, onToggleHaptics, onToggleMusic,
+    onBuy, onBuyUp, onClaimMission, onClaimWeekly, onSwapMission, onSwapWeekly, rewardsOpen, onClaimChest, onClaimSupply, onClaimAch, onBuySkin, onWearSkin, onTutorialDone, onRelocate, onWipe, onToggleSound, onToggleHaptics, onToggleMusic,
     onOpenJournal: () => { S.journalSeen = L.journalCount(S); save(); refresh(); },
     onToggleNotify: native.isNative() ? onToggleNotify : null,
     onRefresh: refresh,
@@ -469,6 +475,7 @@ async function boot() {
   const evNow = L.activeEvent(new Date(now));
   if (evNow) ui.toast('Event: ' + evNow.name + '. ' + evNow.desc, 5000);
   refresh();
+  if (!S.tutorial) ui.showTutorial(); // first launch only
 
   // Store first (it can restore "Remove ads" on a new phone), then ads. None of this blocks play; failure just hides the buttons.
   (async () => {

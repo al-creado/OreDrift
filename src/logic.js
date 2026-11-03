@@ -64,6 +64,7 @@ export function fresh(now = 0) {
     streak: 0, lastSupply: '', daily: null, weekly: null, frenzyUntil: 0, notify: false, podReadyAt: 0,
     iap: { removeAds: false, starter: false, boost: false }, granted: [], journalSeen: 0,
     gifts: {}, // commendation id -> ore gift waiting to be claimed
+    tutorial: false, // the how-to-play card has been seen
     spent: 0, skins: {}, look: { rock: '', fleet: '', sky: '' }, // cosmetics: survey points spent, skins owned, skin worn per slot
   };
 }

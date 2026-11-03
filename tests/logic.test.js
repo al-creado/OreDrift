@@ -1607,7 +1607,7 @@ describe('save-shape defaults', () => {
   it('fresh state has the documented fields', () => {
     const S = L.fresh(42);
     expect(Object.keys(S).sort()).toEqual(['ach', 'allTime', 'daily', 'frenzyUntil', 'gifts', 'haptics', 'last', 'lastSupply', 'owned',
-      'granted', 'iap', 'journalSeen', 'music', 'notify', 'podReadyAt', 'points', 'ore', 'runs', 'skins', 'look', 'spent', 'sound', 'stats', 'streak', 'taps', 'total', 'ups', 'weekly'].sort());
+      'granted', 'iap', 'journalSeen', 'music', 'notify', 'podReadyAt', 'points', 'ore', 'runs', 'skins', 'look', 'spent', 'tutorial', 'sound', 'stats', 'streak', 'taps', 'total', 'ups', 'weekly'].sort());
     expect(S.last).toBe(42);
     expect(S.sound).toBe(true);
   });
