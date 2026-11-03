@@ -34,6 +34,13 @@ android {
             }
         }
     }
+    // Name the APK ore-drift.apk instead of app-debug.apk / app-release.apk. Debug and release are built into
+    // separate folders (outputs/apk/debug and outputs/apk/release), so the names do not clash.
+    applicationVariants.all { variant ->
+        variant.outputs.all {
+            outputFileName = "ore-drift.apk"
+        }
+    }
     buildTypes {
         release {
             if (keystorePropertiesFile.exists()) {
