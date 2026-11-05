@@ -11,7 +11,7 @@ import { FRENZY_MULT } from './data.js';
 import * as L from './logic.js';
 import { createScene } from './scene.js';
 import { createUI } from './ui.js';
-import { sounds, setSoundEnabled } from './audio.js';
+import { sounds, setSoundEnabled, setRetro } from './audio.js';
 import { startMusic, stopMusic } from './music.js';
 import { beltFor } from './belts.js';
 import { loadState, saveState } from './storage.js';
@@ -143,6 +143,7 @@ function onClaimAch(chainId) {
 
 function refresh() {
   const now = Date.now();
+  if (retroUntil && now >= retroUntil) endRetro();
   housekeeping(now);
   setSoundEnabled(S.sound);
   native.setHapticsEnabled(S.haptics);
@@ -164,13 +165,17 @@ function catchComet() {
   if (kind === 'ship') {
     const r = L.catchSupplyShip(S, now);
     ui.toast('Supply ship! Output ×' + FRENZY_MULT + ' for ' + r.sec + ' s.', 3500);
+  } else if (kind === 'duck') {
+    const r = L.catchDuck(S, now, Math.random(), L.cometMult(new Date(now)));
+    ui.toast('A rubber duck! +' + L.fmt(r.gain) + ' t and output ×' + FRENZY_MULT + ' for ' + r.sec + ' s. Quack!', 4500);
   } else {
     const mult = L.cometMult(new Date(now)), r = L.catchComet(S, Math.random(), mult);
     ui.toast('Comet! +' + L.fmt(r.gain) + ' t of ore' + (mult > 1 ? ' (×' + mult + ' event)' : '') + '.', 3500);
   }
   catchRun++;
   L.noteCatchRun(S, catchRun);
-  sounds.comet(); native.impact(true);
+  if (kind === 'duck') sounds.duckCaught(); else sounds.comet();
+  native.impact(true);
   refresh();
 }
 
@@ -210,6 +215,35 @@ function onWipe() {
   ui.toast('Save wiped. Fresh belt.');
   syncMusic();
   if (shopOn()) syncPurchases(false); // purchases live with the Google account, so bring owned items (Remove ads, boost) straight back
+}
+
+/* ---------- easter eggs: the secret swipe code switches on 8-bit mode for a minute ---------- */
+const RETRO_MS = 60000;
+let retroUntil = 0;
+let secret = { i: 0, at: 0 };
+const retroLeft = (now) => Math.max(0, retroUntil - now);
+function setRetroMode(on) {
+  document.documentElement.classList.toggle('retro', on);
+  scene.setRetro(on);
+  setRetro(on);
+}
+function startRetro() {
+  const now = Date.now(), was = retroUntil > now;
+  retroUntil = now + RETRO_MS;
+  if (!was) setRetroMode(true);
+  ui.toast('8-BIT MODE! Sixty seconds of pixels.', 3500);
+  sounds.retroOn();
+}
+function endRetro() {
+  retroUntil = 0;
+  setRetroMode(false);
+  sounds.retroOff();
+  ui.toast('Back to full colour.');
+}
+function feedSecret(input) {
+  const r = L.feedSecretCode(secret, input, Date.now());
+  secret = r.state;
+  if (r.done) startRetro();
 }
 
 function onTutorialDone() {
@@ -431,6 +465,7 @@ async function boot() {
 
   ui = createUI({
     getState: () => S,
+    retroLeft: () => retroLeft(Date.now()),
     onBuy, onBuyUp, onClaimMission, onClaimWeekly, onSwapMission, onSwapWeekly, rewardsOpen, onClaimChest, onClaimSupply, onClaimAch, onBuySkin, onWearSkin, onTutorialDone, onRelocate, onWipe, onToggleSound, onToggleHaptics, onToggleMusic,
     onOpenJournal: () => { S.journalSeen = L.journalCount(S); save(); refresh(); },
     onToggleNotify: native.isNative() ? onToggleNotify : null,
@@ -441,7 +476,8 @@ async function boot() {
     version: 'Version ' + __APP_VERSION__,
   });
   ui.init();
-  if (PRIVACY_URL) { const a = $('privacy'); a.href = PRIVACY_URL; a.hidden = false; }
+  if (PRIVACY_URL) { const a = $('privacy-web'); a.href = PRIVACY_URL; a.hidden = false; } // the web copy, linked from the in-app policy
+  setTimeout(() => import('@fontsource/press-start-2p/400.css'), 4000); // the 8-bit mode font, fetched quietly in the background
 
   const cv = $('cv');
   scene = createScene(cv, {
@@ -451,15 +487,30 @@ async function boot() {
     fleet: () => S.owned,
     look: () => S.look,
     belt: () => S.runs,
-    onCometSpawn: (kind) => (kind === 'ship' ? sounds.shipSpawn() : sounds.cometSpawn()),
-    onCometPing: (kind) => (kind === 'ship' ? sounds.shipPing() : sounds.cometPing()),
+    onCometSpawn: (kind) => (kind === 'ship' ? sounds.shipSpawn() : kind === 'duck' ? sounds.duckSpawn() : sounds.cometSpawn()),
+    onCometPing: (kind) => (kind === 'ship' ? sounds.shipPing() : kind === 'duck' ? sounds.duckPing() : sounds.cometPing()),
     onCometMissed: () => { catchRun = 0; }, // letting one pass breaks the run of catches
   });
+  let gesture = null;
   cv.addEventListener('pointerdown', (e) => {
     e.preventDefault();
+    gesture = { x: e.clientX, y: e.clientY, id: e.pointerId };
+    try { cv.setPointerCapture(e.pointerId); } catch (err) { /* not every browser captures */ }
     const r = cv.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
     if (scene.hitComet(x, y)) catchComet(); else doTap(x, y);
   });
+  // A swipe (up, down, left or right) or a tap on the asteroid feeds the secret code.
+  cv.addEventListener('pointerup', (e) => {
+    if (!gesture || gesture.id !== e.pointerId) return;
+    const dx = e.clientX - gesture.x, dy = e.clientY - gesture.y;
+    gesture = null;
+    if (Math.hypot(dx, dy) < 48) feedSecret('t');
+    else feedSecret(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'r' : 'l') : (dy > 0 ? 'd' : 'u'));
+  });
+  cv.addEventListener('pointercancel', () => { gesture = null; });
+  // On a keyboard: the arrow keys, then B and A.
+  const KEY_CODE = { ArrowUp: 'u', ArrowDown: 'd', ArrowLeft: 'l', ArrowRight: 'r', b: 't', B: 't', a: 't', A: 't' };
+  window.addEventListener('keydown', (e) => { if (KEY_CODE[e.key]) feedSecret(KEY_CODE[e.key]); });
   cv.addEventListener('keydown', (e) => {
     if (e.key === ' ' || e.key === 'Enter') {
       e.preventDefault();

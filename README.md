@@ -4,7 +4,7 @@ A space-mining idle clicker for Android. Tap an asteroid, hire auto-miners, inst
 
 It is a Vite and vanilla JavaScript game wrapped for Android with Capacitor. It plays offline with no account and no analytics. It is free with ads: a banner at the bottom plus optional rewarded ads (Google AdMob). A Shop for optional purchases through Google Play is built but switched off for now (see [Ads and shop](#ads-and-shop)).
 
-- Privacy policy: see [docs/index.html](docs/index.html) (published through GitHub Pages)
+- Privacy policy: [docs/index.html](docs/index.html) is published through GitHub Pages (the link Play Console needs) and is also built into the app (Settings > Privacy policy), which reads the same file, so the two always match
 - Game rules, design and publishing steps: [docs/BUILD-GUIDE.md](docs/BUILD-GUIDE.md) (written earlier in the project, so it does not describe every recent feature)
 
 ## What is in the game
@@ -16,6 +16,11 @@ It is a Vite and vanilla JavaScript game wrapped for Android with Capacitor. It 
 - **Captain's log tab:** the Captain's journal (10 chapters that unlock as you play) and the logbook of stats.
 - **Extras:** weekly events, a welcome-back summary, a four-card tutorial for new players, local reminders, synthesized music and sound effects.
 - **Bottom nav:** Fleet, Upgrades, Goals, Belt, Captain's log, and Shop (hidden until it is switched on). It uses icons only (`src/icons.js`).
+
+## Easter eggs (spoilers)
+
+- **Rubber duck:** a rare flyer (about 1 in 33). It pays 30 to 60 minutes of output plus a 20 second x7 boost, quacks, and counts as a flyer caught. A "Rubber ducks" line appears in the logbook after the first one. Rules are in `logic.js` (`DUCK_*`, `catchDuck`), the drawing in `scene.js`, the quack in `audio.js`.
+- **8-bit mode:** on the asteroid, swipe up, up, down, down, left, right, left, right, then tap twice (on a keyboard: the arrow keys, then B and A). The game turns into pixels for 60 seconds: the canvas is drawn at low resolution, the UI gets a pixel font, hard edges and scanlines, and sounds become square waves. Matching is in `logic.js` (`feedSecretCode`); the mode is wired in `main.js` and styled under `html.retro` in `style.css`. Nothing in it is saved.
 
 ## Run it in a browser
 
@@ -77,7 +82,7 @@ src/
   music.js      slow space-ambient background music, synthesized
   main.js       boot, game loop, wiring, the in-app splash
   splash-logo.webp  artwork for the in-app splash
-tests/          Vitest suites and the pacing simulator
+tests/          Vitest suites (game rules, saves, the privacy page) and the pacing simulator
 reference/      the original web prototype the game was ported from
 store/          Play Store listing text, icon, feature graphic, product icons, screenshots
 assets/         source art for the app icon and splash screen

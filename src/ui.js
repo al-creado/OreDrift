@@ -3,6 +3,7 @@ import { GENS, UPS, ACHS, MILESTONES, FRENZY_MULT, PRODUCTS, ACH_GROUPS, TIER_NA
 import * as L from './logic.js';
 import { beltFor, skinRockColors } from './belts.js';
 import { icon } from './icons.js';
+import policyHtml from '../docs/index.html?raw'; // the hosted privacy policy page: one file feeds the web page and this in-app copy
 
 const $ = (id) => document.getElementById(id);
 const setText = (el, s) => { if (el.textContent !== s) el.textContent = s; };
@@ -60,6 +61,26 @@ export function createUI(h) {
   function closeJournal() {
     if ($('journal').hidden) return false;
     $('journal').hidden = true;
+    return true;
+  }
+
+  /* ---------- privacy policy (the same text as the hosted page) ---------- */
+  let policyBuilt = false;
+  function openPolicy() {
+    if (!policyBuilt) {
+      const doc = new DOMParser().parseFromString(policyHtml, 'text/html');
+      const title = doc.body.querySelector('h1'); if (title) title.remove(); // the overlay has its own heading
+      doc.body.querySelectorAll('a[href^="http"]').forEach((a) => { a.target = '_blank'; a.rel = 'noopener'; });
+      $('policy-body').innerHTML = doc.body.innerHTML;
+      policyBuilt = true;
+    }
+    $('policy').hidden = false; $('policy-body').scrollTop = 0;
+    $('policy-close').focus();
+  }
+  /** Returns true if the policy was open (so the back button knows it handled the press). */
+  function closePolicy() {
+    if ($('policy').hidden) return false;
+    $('policy').hidden = true;
     return true;
   }
 
@@ -170,7 +191,7 @@ export function createUI(h) {
     h.onTutorialDone();
     return true;
   }
-  const closeOverlay = () => closeTutorial() || closeWelcome() || closeJournal();
+  const closeOverlay = () => closeTutorial() || closePolicy() || closeWelcome() || closeJournal();
 
   /* ---------- fleet ---------- */
   const cards = {};
@@ -319,6 +340,8 @@ export function createUI(h) {
     setText($('st-taps'), s.taps.toLocaleString('en-US'));
     setText($('st-fleet'), String(L.fleetCount(s)));
     setText($('st-runs'), String(s.runs));
+    $('st-duck-k').hidden = $('st-duck').hidden = !(s.stats.ducks > 0); // stays secret until the first duck
+    setText($('st-duck'), String(s.stats.ducks || 0));
     setText($('st-comets'), String(s.stats.comets)); setText($('st-missions'), String(s.stats.missions));
     setText($('st-played'), L.fmtDur(s.stats.played)); setText($('st-peak'), L.fmt(s.stats.peak) + ' t/s'); setText($('st-run-best'), String(s.stats.bestRun));
     setText($('st-best'), s.stats.best + (s.stats.best === 1 ? ' day' : ' days')); setText($('st-ach'), L.achCount(s) + ' of ' + ACHS.length);
@@ -660,6 +683,8 @@ export function createUI(h) {
     ep.hidden = !evNow; if (evNow) { setText(ep, evNow.name); ep.title = evNow.desc; }
     const b = $('bonus'), bx = L.surveyMult(s) * L.achMult(s) * L.iapMult(s) - 1;
     if (bx >= 0.005) { b.hidden = false; setText(b, '+' + L.fmtPct(bx, 0) + ' bonus'); } else b.hidden = true;
+    const rl = h.retroLeft ? h.retroLeft() : 0, rp = $('retropill'); // 8-bit mode countdown
+    if (rl > 0) { rp.hidden = false; setText(rp, '8-BIT ' + Math.ceil(rl / 1000) + ' s'); } else rp.hidden = true;
     const fz = $('frenzy');
     if (L.frenzyOn(s, now)) { fz.hidden = false; setText(fz, '×' + FRENZY_MULT + ' for ' + Math.ceil(L.frenzyLeft(s, now)) + 's'); } else fz.hidden = true;
     updateOre(s);
@@ -722,6 +747,8 @@ export function createUI(h) {
       h.onRefresh();
     });
     $('journal-open').addEventListener('click', openJournal);
+    $('privacy').addEventListener('click', openPolicy);
+    $('policy-close').addEventListener('click', closePolicy);
     document.querySelectorAll('.nav button').forEach((b) => b.insertAdjacentHTML('afterbegin', icon(b.dataset.tab)));
     $('tut-next').addEventListener('click', () => { if (tutStep < TUTORIAL.length - 1) { tutStep++; renderTutorial(); } else closeTutorial(); });
     $('tut-skip').addEventListener('click', closeTutorial);

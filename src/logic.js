@@ -60,7 +60,7 @@ export function fresh(now = 0) {
   return {
     ore: 0, total: 0, allTime: 0, taps: 0, points: 0, runs: 0,
     owned: {}, ups: {}, last: now, sound: true, music: true, haptics: true, ach: {},
-    stats: { comets: 0, missions: 0, best: 0, ships: 0, drops: 0, chests: 0, capped: 0, night: 0, bare: 0, bestRun: 0, overdrive: 0, played: 0, peak: 0 },
+    stats: { comets: 0, missions: 0, best: 0, ships: 0, drops: 0, chests: 0, capped: 0, night: 0, bare: 0, bestRun: 0, overdrive: 0, played: 0, peak: 0, ducks: 0 },
     streak: 0, lastSupply: '', daily: null, weekly: null, frenzyUntil: 0, notify: false, podReadyAt: 0,
     iap: { removeAds: false, starter: false, boost: false }, granted: [], journalSeen: 0,
     gifts: {}, // commendation id -> ore gift waiting to be claimed
@@ -659,6 +659,47 @@ export function catchComet(S, rand, mult = 1) {
   const g = minutesOfOre(S, minutes, COMET_FLOOR) * mult;
   gain(S, g, true);
   return { kind: 'ore', gain: g, minutes };
+}
+
+/* ---------- easter eggs ---------- */
+/** About one flyer in thirty-three is a rubber duck instead. `r` is a 0..1 random value. */
+export const DUCK_CHANCE = 0.03;
+export const isDuck = (r) => r < DUCK_CHANCE;
+export const DUCK_MIN_MINUTES = 30;
+export const DUCK_MAX_MINUTES = 60;
+export const DUCK_FLOOR = 2000;
+export const DUCK_BOOST_SECONDS = 20;
+
+/** Mutates S. A rubber duck pays 30 to 60 minutes of current output and a short boost; rand is 0..1. Counts as a flyer caught. */
+export function catchDuck(S, now, rand, mult = 1) {
+  S.stats.comets++;
+  S.stats.ducks++;
+  addProg(S, 'comet', 1);
+  const minutes = DUCK_MIN_MINUTES + rand * (DUCK_MAX_MINUTES - DUCK_MIN_MINUTES);
+  const g = minutesOfOre(S, minutes, DUCK_FLOOR) * mult;
+  gain(S, g, true);
+  startFrenzy(S, now, DUCK_BOOST_SECONDS);
+  return { kind: 'duck', gain: g, minutes, sec: DUCK_BOOST_SECONDS };
+}
+
+/**
+ * The secret swipe code: up, up, down, down, left, right, left, right, then two taps.
+ * `state` is { i, at } (how far along, and when the last input came). Returns { state, done }.
+ * A wrong input falls back to the longest tail that still starts the code, and a pause of more than 3 seconds starts over.
+ */
+export const SECRET_CODE = ['u', 'u', 'd', 'd', 'l', 'r', 'l', 'r', 't', 't'];
+export const SECRET_GAP_MS = 3000;
+export function feedSecretCode(state, input, now) {
+  let i = state.i;
+  if (i > 0 && now - state.at > SECRET_GAP_MS) i = 0;
+  if (input === SECRET_CODE[i] && i + 1 === SECRET_CODE.length) return { state: { i: 0, at: now }, done: true };
+  // Keep the longest tail of what was entered that still starts the code, so an extra swipe does not lose your place.
+  const seq = [...SECRET_CODE.slice(0, i), input];
+  let next = 0;
+  for (let k = Math.min(seq.length, SECRET_CODE.length - 1); k > 0; k--) {
+    if (seq.slice(seq.length - k).every((x, j) => x === SECRET_CODE[j])) { next = k; break; }
+  }
+  return { state: { i: next, at: now }, done: false };
 }
 
 /* ---------- rewarded ad: cargo pod ---------- */

@@ -1575,6 +1575,60 @@ describe('shop', () => {
 });
 
 describe('save-shape defaults', () => {
+  describe('easter eggs', () => {
+    it('a rubber duck is rare: about 1 flyer in 33', () => {
+      expect(L.DUCK_CHANCE).toBe(0.03);
+      expect(L.isDuck(0)).toBe(true);
+      expect(L.isDuck(0.0299)).toBe(true);
+      expect(L.isDuck(0.03)).toBe(false);
+      expect(L.isDuck(0.99)).toBe(false);
+    });
+    it('catching a duck pays 30 to 60 minutes of output, a short boost, and counts as a flyer', () => {
+      const S = state({ owned: { laser: 10 } }); // 20 t/s = 1,200 t/min
+      const lo = L.catchDuck(S, NOW, 0), hi = L.catchDuck(S, NOW, 1);
+      expect(lo.gain).toBeCloseTo(30 * 1200, 6); expect(hi.gain).toBeCloseTo(60 * 1200, 6);
+      expect(lo.sec).toBe(20);
+      expect(S.stats.ducks).toBe(2); expect(S.stats.comets).toBe(2); expect(S.stats.ships).toBe(0);
+      expect(S.frenzyUntil).toBeGreaterThan(NOW);
+      expect(S.ore).toBeCloseTo(lo.gain + hi.gain, 6);
+    });
+    it('has a floor for a brand new player, and an event multiplier applies', () => {
+      expect(L.catchDuck(state(), NOW, 0).gain).toBe(2000);
+      expect(L.catchDuck(state(), NOW, 0, 2).gain).toBe(4000);
+    });
+    it('a duck counts toward the comet mission', () => {
+      const S = state();
+      S.daily = { day: 'x', chest: false, missions: [
+        { type: 'comet', target: 3, progress: 0, claimed: false },
+        { type: 'tap', target: 5, progress: 0, claimed: false },
+        { type: 'buy', target: 5, progress: 0, claimed: false }] };
+      L.catchDuck(S, NOW, 0.5);
+      expect(S.daily.missions[0].progress).toBe(1);
+    });
+    const run = (inputs, t0 = 0, gap = 500) => {
+      let st = { i: 0, at: 0 }, done = false;
+      inputs.forEach((x, k) => { const r = L.feedSecretCode(st, x, t0 + k * gap); st = r.state; done = done || r.done; });
+      return done;
+    };
+    it('the secret code is up up down down left right left right tap tap', () => {
+      expect(L.SECRET_CODE).toEqual(['u', 'u', 'd', 'd', 'l', 'r', 'l', 'r', 't', 't']);
+      expect(run(['u', 'u', 'd', 'd', 'l', 'r', 'l', 'r', 't', 't'])).toBe(true);
+    });
+    it('a wrong step starts over, and a mistake that is the first step keeps one in hand', () => {
+      expect(run(['u', 'u', 'd', 'l', 'r', 'l', 'r', 't', 't'])).toBe(false);
+      expect(run(['u', 'u', 'u', 'd', 'd', 'l', 'r', 'l', 'r', 't', 't'])).toBe(true); // an extra 'u' then the real code
+      expect(run(['t', 't', 'u', 'u', 'd', 'd', 'l', 'r', 'l', 'r', 't', 't'])).toBe(true); // ordinary taps before it do not matter
+    });
+    it('ordinary play never triggers it, and a pause of over 3 seconds starts over', () => {
+      expect(run(Array(200).fill('t'))).toBe(false);
+      expect(run(['u', 'u', 'd', 'd', 'l', 'r', 'l', 'r', 't', 't'], 0, 3500)).toBe(false);
+      expect(run(['u', 'u', 'd', 'd', 'l', 'r', 'l', 'r', 't', 't'], 0, 2900)).toBe(true);
+    });
+    it('after it fires it is ready for the next time', () => {
+      expect(run(['u', 'u', 'd', 'd', 'l', 'r', 'l', 'r', 't', 't', 'u', 'u', 'd', 'd', 'l', 'r', 'l', 'r', 't', 't'])).toBe(true);
+    });
+  });
+
   describe('cosmetic skins', () => {
     const rock = () => SKINS.find((k) => k.slot === 'rock' && k.cost === 2), pricey = () => SKINS.find((k) => k.cost >= 10);
     it('buying spends spare points, wears the skin, and cannot go below zero', () => {

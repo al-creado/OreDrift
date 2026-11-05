@@ -13,7 +13,7 @@
       <header class="hud"><div class="in">
         <div class="label">Ore in hold</div>
         <div class="ore-row"><span class="ore" id="ore">0</span><span class="unit" title="tonnes">t</span></div>
-        <div class="rates"><span id="rate">+0 t/s</span><span id="tapv">tap +1</span><span class="pill" id="bonus" hidden title="Survey points and commendations"></span><span class="pill hot" id="frenzy" hidden></span><span class="pill" id="evpill" hidden></span></div>
+        <div class="rates"><span id="rate">+0 t/s</span><span id="tapv">tap +1</span><span class="pill" id="bonus" hidden title="Survey points and commendations"></span><span class="pill hot" id="frenzy" hidden></span><span class="pill" id="evpill" hidden></span><span class="pill hot" id="retropill" hidden></span></div>
       </div></header>
 
       <section class="stage">
@@ -120,6 +120,7 @@
                 <dt>Time played</dt><dd id="st-played">0 m</dd>
                 <dt>Highest output</dt><dd id="st-peak">0 t/s</dd>
                 <dt>Comets and ships caught</dt><dd id="st-comets">0</dd>
+                <dt id="st-duck-k" hidden>Rubber ducks</dt><dd id="st-duck" hidden>0</dd>
                 <dt>Best catch streak</dt><dd id="st-run-best">0</dd>
                 <dt>Missions done</dt><dd id="st-missions">0</dd>
                 <dt>Best supply streak</dt><dd id="st-best">0 days</dd>
@@ -174,7 +175,7 @@
               <button class="btn danger" id="wipe" type="button">Wipe save</button>
               <p class="note">Progress is saved on this device only.</p>
               <div class="legal">
-                <a id="privacy" href="#" target="_blank" rel="noopener" hidden>Privacy policy</a>
+                <button class="btn" id="privacy" type="button">Privacy policy</button>
                 <span id="version"></span>
               </div>
             </div>
@@ -194,6 +195,11 @@
     <div class="journal" id="journal" role="dialog" aria-modal="true" aria-label="Captain's journal" hidden>
       <div class="jhead"><h2>Captain's journal</h2><button class="jx" id="journal-close" type="button" aria-label="Close the journal">✕</button></div>
       <div class="jbody" id="jbody"></div>
+    </div>
+    <div class="journal" id="policy" role="dialog" aria-modal="true" aria-label="Privacy policy" hidden>
+      <div class="jhead"><h2>Privacy policy</h2><button class="jx" id="policy-close" type="button" aria-label="Close the privacy policy">✕</button></div>
+      <div class="jbody policybody" id="policy-body"></div>
+      <div class="policyfoot"><a id="privacy-web" href="#" target="_blank" rel="noopener" hidden>Open the web version</a></div>
     </div>
     <div class="welcome" id="welcome" role="dialog" aria-modal="true" aria-labelledby="wel-title" hidden>
       <div class="sect">
