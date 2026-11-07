@@ -278,7 +278,7 @@ export const JOURNAL = [
     id: 'j3', title: 'A Light in the Sky', stat: 'comets', t: 1, req: 'Catch a comet or a supply ship.',
     text: [
       "Something bright crossed the sky today. First a comet, shedding rock like a dropped sack of coins, then a supply ship with its lamps blazing, hauling crates for anyone quick enough to wave it down.",
-      "Catch what passes. The Drift rewards the miner who keeps looking up. They tell of a pilot who snagged five lights in a row and never let a single one slip by him. Nobody has ever proved it.",
+      "Catch what passes. The Drift rewards the miner who keeps looking up. They tell of a pilot who never let a single light slip by him, not one, through a long and lucky watch. Nobody has ever proved it.",
     ],
   },
   {
@@ -305,21 +305,21 @@ export const JOURNAL = [
   {
     id: 'j7', title: 'What the Dock Remembers', stat: 'allTime', t: 1e8, req: 'Mine 100 million t in total.',
     text: [
-      "On quiet nights you read the old logs aloud. The fleet works while you sleep; it always has. Leave it alone long enough that it nods off on the job, eight hours and a breath, and the hold is not so much full as astonished.",
-      "One foreman swore the lamps of a supply ship once burned two whole minutes without dimming, crate stacked on crate, as if the sky itself owed him a favour.",
+      "On quiet nights you read the old logs aloud. The fleet works while you sleep; it always has. Leave it alone long enough that it nods off on the job, and the hold is not so much full as astonished.",
+      "One foreman swore the lamps of a supply ship once burned far longer than lamps should, crate stacked on crate, as if the sky itself owed him a favour.",
     ],
   },
   {
     id: 'j8', title: 'The Hoard', stat: 'allTime', t: 1e9, req: 'Mine 1 billion t in total.',
     text: [
-      "Every belt has its legend, and this one has a dragon. They say it sleeps on a billion tonnes and has never spent a gram, and that it counts the pile every night by the light of its own scales.",
+      "Every belt has its legend, and this one has a dragon. They say it sleeps on a pile no one has dared to count and has never spent a gram, and that it counts it every night by the light of its own scales.",
       "You are not a dragon. You spend. But on the quiet nights you wonder what that much ore would look like in one place.",
     ],
   },
   {
     id: 'j9', title: 'The Colours of the Drift', stat: 'runs', t: 5, req: 'Relocate 5 times.',
     text: [
-      "Eight colours hang in the Drift, and no two belts are alike. Whoever has stood under every one of them is owed a story, and a drink, and probably an apology from the company.",
+      "The Drift hangs in more colours than the charts admit, and no two belts are alike. Whoever has stood under every one of them is owed a story, and a drink, and probably an apology from the company.",
       "You have started keeping a pocket of dust from each. The jar is getting heavy.",
       "Someone has scratched a greeting into the dock wall, in a hand older than the company's: two strokes rising, two falling, a sweep left and right and left and right again, then two knocks to show you meant it. The foremen say the rock answers, and that when it does, the Drift remembers how it used to look.",
     ],
