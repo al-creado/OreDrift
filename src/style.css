@@ -168,6 +168,8 @@ canvas { display: block; width: 100%; height: 100%; touch-action: none; outline-
 .card.ach.claim { grid-template-columns: 52px minmax(0, 1fr) auto; }
 .card.ach .count { font-size: .85rem; color: var(--muted); }
 .card.ach { transition: box-shadow .6s, border-color .6s; }
+#ach-claim { transition: box-shadow .6s; }
+#ach-claim.spot { box-shadow: 0 0 0 3px #fff3b0, 0 0 22px rgba(242, 162, 78, .75); }
 .card.ach.spot { border-color: var(--ore); box-shadow: 0 0 0 2px var(--ore), 0 0 18px rgba(242, 162, 78, .45); }
 .card.ach.done { border-color: var(--ore-deep); }
 .card.ach.done .count { background: var(--ore); border-color: var(--ore); color: var(--ore-ink); font-size: 1.2rem; }

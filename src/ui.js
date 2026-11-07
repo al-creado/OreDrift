@@ -602,8 +602,21 @@ export function createUI(h) {
     updateAch(s);
     if (goalsFocus) { const f = goalsFocus; goalsFocus = null; spotlightReward(s, f); }
   }
-  /** Scrolls to a commendation card and flashes it: the given chain's, or else the first with a reward waiting. */
+  /**
+   * Scrolls to a commendation reward and flashes it. A commendation that was asked for (f.chain, from its banner) is shown first.
+   * Otherwise, when several rewards are waiting, the "Claim all" button is the place to start; with just one, its card.
+   */
   function spotlightReward(s, f) {
+    const smooth = matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
+    if (!f.chain && L.pendingGifts(s).count >= 2) {
+      const all = $('ach-claim');
+      if (!all.hidden) {
+        all.scrollIntoView({ block: 'center', behavior: smooth });
+        all.classList.add('spot');
+        setTimeout(() => all.classList.remove('spot'), 1800);
+        return;
+      }
+    }
     const find = () => (f.chain ? achEls.find((e) => e.chain.id === f.chain) : achEls.find((e) => !e.btn.hidden));
     let e = find();
     if (!e && (f.chain || L.pendingGifts(s).count > 0)) { // the current view leaves it out: show every chain
@@ -613,7 +626,7 @@ export function createUI(h) {
       e = find();
     }
     if (!e) return; // nothing waiting: stay at the top, where the daily rewards are
-    e.root.scrollIntoView({ block: 'center', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+    e.root.scrollIntoView({ block: 'center', behavior: smooth });
     e.root.classList.add('spot');
     setTimeout(() => e.root.classList.remove('spot'), 1800);
   }
