@@ -34,7 +34,7 @@ WHAT YOU DO
 • Join weekly events that send more comets and supply ships your way.
 • Earn 71 commendations from Bronze to Platinum, with eight secret ones to discover, and rise in rank from Rookie to Legend.
 • Read the Captain's journal, a story of the Drift that unlocks chapter by chapter.
-• Relocate to a new belt to earn survey points. Each one adds +10% to all output and taps, forever.
+• Relocate to a new belt for a permanent bonus to all output and taps, plus a survey point to spend. The more you mined, the bigger the bonus.
 • Spend survey points on skins for your asteroid, your fleet and the sky. They only change the look, so your bonus never goes down.
 • A few hidden surprises are waiting for sharp-eyed captains.
 

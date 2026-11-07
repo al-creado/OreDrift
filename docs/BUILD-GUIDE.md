@@ -137,7 +137,7 @@ prodMult      = (product of owned "tune" upgrades) * surveyMult * achMult * iapM
 ops (ore/s)   = vesselOutput * prodMult * (frenzy ? 7 : 1)
 tapValue      = (product of owned "tap" upgrades) * surveyMult * achMult * iapMult * (frenzy ? 7 : 1)
                 + ops * (sum of owned "uplink" fractions)
-surveyMult    = 1 + 0.10 * surveyPoints
+surveyMult    = 1 + 0.10 * surveyPower   // power = the bonus steps earned by relocating (S.power)
 achMult       = 1 + (sum of the bonus of every commendation earned)   // 1% each for the original 32, 0.5% each for the 39 added later
 iapMult       = 1.25 once the Prospector boost has been bought (shop), else 1
 ```
@@ -156,9 +156,10 @@ Absences under 2 minutes show a toast: "Away 3 m. Your fleet mined +X t at half 
 
 ### 3.6 Relocate (prestige)
 
-- Survey points gained now: `floor(sqrt(totalMinedThisRun / pointCost))`, where `pointCost = 1,000,000 * (1 + pointsHeld / 10) ^ 3`. Holding more points makes the next ones dearer, so a stronger fleet cannot spam relocations.
+- Bonus steps gained now: `floor(sqrt(totalMinedThisRun / stepCost))`, where `stepCost = 1,000,000 * (1 + stepsHeld / 10) ^ 3`. Holding more steps makes the next ones dearer, so a stronger fleet cannot spam relocations. Each step adds +10% to output and taps (the survey bonus, `S.power`).
+- A relocation always gives exactly **1 survey point** (`S.points`), however big the run. Survey points are the currency for skins (3.14). The bonus is what grows with a bigger run, and it is tracked separately, so spending points never lowers it. A save from before this split starts with `power = points`.
 - Relocate needs at least 1 point. It requires a second tap to confirm ("Tap again to relocate", resets after 4 seconds).
-- It resets: ore, this-run total, vessels, upgrades. It keeps: survey points, lifetime ore, taps, relocation count, commendations, missions, streak, stats, sound setting.
+- It resets: ore, this-run total, vessels, upgrades. It keeps: survey points, the survey bonus, lifetime ore, taps, relocation count, commendations, missions, streak, stats, sound setting.
 - Each point adds +10% to all vessel output and taps. Spare points can also be spent on cosmetic skins (3.14); spending never lowers the bonus, which always counts every point earned (`S.points`; `S.spent` only tracks what was spent).
 - The Belt tab shows how much more ore the next point needs: `(gain+1)^2 * pointCost`.
 
@@ -222,7 +223,7 @@ They are checked continuously. The number earned sets the rank: Rookie 0, Prospe
 | Fleet | Fleet size (10, 50, 150, 400, 1,000), Vessel kinds (3, 5, 7), One kind (50, 100, 200) |
 | Upgrades | Upgrades in one run (3, 6, 10, 15) |
 | Belts | Relocations (1, 5, 10, 20), Rings, Spectrum and Bare hands (secret) |
-| Survey | Survey points held (10, 50, 200, 1,000) |
+| Survey | Survey bonus reached (+100%, +500%, +2,000%, +10,000%) |
 | Flyers | Flyers caught (1, 25, 100), Supply ships (10, 50, 200), Comets (10, 50, 200), Eagle eye and Overdrive (secret) |
 | Missions | Missions done (3, 30, 100), Daily caches (1, 7, 30) |
 | Supply | Best supply streak (3, 7, 30 days), Supply drops claimed (10, 50, 150) |
@@ -232,7 +233,7 @@ Locked ones show a progress bar and "value / target". The list has three views: 
 
 ### 3.12 Pacing target (a regression check)
 
-A simulated player who buys the best-value item every second reaches roughly: 10K total ore at 8 minutes, 100K at 19 minutes, 1M (first survey point) at 36 minutes, 10M at 66 minutes, 1B at about 200 minutes. Keep the economy within about 15% of this unless you deliberately rebalance. The same simulated player (3 taps a second) needs about 30 minutes for the first survey point, 22 minutes for the 10th, 17 for the 25th, 13 for the 50th and 11 for the 100th. Without the growing point cost (3.6) the 100th took only 2.5 minutes, which made relocating easy to spam.
+A simulated player who buys the best-value item every second reaches roughly: 10K total ore at 8 minutes, 100K at 19 minutes, 1M (the first bonus step) at 36 minutes, 10M at 66 minutes, 1B at about 200 minutes. Keep the economy within about 15% of this unless you deliberately rebalance. The same simulated player (3 taps a second) needs about 30 minutes for the first bonus step, 22 minutes for the 10th, 17 for the 25th, 13 for the 50th and 11 for the 100th (counting steps held; a relocation can give several). Without the growing point cost (3.6) the 100th took only 2.5 minutes, which made relocating easy to spam.
 
 ### 3.13 Weekly events
 
@@ -240,7 +241,7 @@ Two events follow the player's local calendar (no server): **Meteor weekend** (S
 
 ### 3.14 Cosmetic skins
 
-Skins change how the game looks and nothing else. They are bought with spare survey points (`points - spent`), worn per slot, and kept through relocation. A skin can be worn only if owned, and `spent` can never exceed `points` (the save loader enforces both).
+Skins change how the game looks and nothing else. They are bought with spare survey points (`points - spent`; a relocation gives exactly 1), worn per slot, and kept through relocation. A skin can be worn only if owned, and `spent` can never exceed `points` (the save loader enforces both).
 - **Asteroid** (11): the colours of the seven other belts (2 points each), plus Gilded, Neon Core, Rose Quartz and Void (6 each). The shape still follows the belt.
 - **Fleet paint** (5): Midnight, Copper, Emerald (4 each), Crimson (6), Gold fleet (10).
 - **Sky** (4): Warm stars (3), Aurora, Violet nebula and Deep blue (6 each, with a coloured glow behind the asteroid).
@@ -258,14 +259,14 @@ Costs are constants in `src/data.js` (`SKINS`).
 
 ### 4.1 Layout (portrait only)
 
-- **Header:** "ORE IN HOLD" label, large ore number with a small orange `t`, then a row with `+X t/s`, `tap +Y`, a bonus pill (`+N% bonus` from survey points, commendations and the shop boost, abbreviated like ore once it passes 1,000%), the frenzy pill, an event pill, and (briefly) the 8-bit countdown.
+- **Header:** "ORE IN HOLD" label, large ore number with a small orange `t`, then a row with `+X t/s`, `tap +Y`, a bonus pill (`+N% bonus` from the survey bonus, commendations and the shop boost, abbreviated like ore once it passes 1,000%), the frenzy pill, an event pill, and (briefly) the 8-bit countdown.
 - **Stage:** canvas, about one third of the screen height. A rotating asteroid with glowing ore veins, craters, twinkling stars, small ships that orbit it (one per owned vessel, max 14, with brief mining beams), tap particles and floating `+value` text, and the flyers. Skins recolour the asteroid, the ships and the sky.
 - **Toast:** an overlay at the top of the stage. Messages queue (max 4) and show one at a time for about 3.2 seconds (tap to dismiss). Commendations use their own banner.
 - **Tabs (bottom nav, icons only, with accessible names):** Fleet (rocket), Upgrades (chevrons), Goals (trophy), Belt (ringed planet), Captain's log (logbook), and Shop (bag, hidden while `SHOP_ENABLED` is false). A small orange dot marks a tab with something ready.
   - Fleet: buy mode switch (x1, x10, Max) and one card per vessel.
   - Upgrades: one card per visible upgrade, plus "N installed, M left".
   - Goals: next event, supply drop, daily missions, weekly missions, daily cache, commendations (with Claim buttons for their ore gifts).
-  - Belt: a switcher with three views. **Relocate** (survey points, what you gain and lose, the Relocate button with a confirm tap), **Cosmetics** (skins, 3.14) and **Settings** (sound, music, vibration, how to play, reminders on Android, ad privacy choices when required, wipe save with a confirm tap, Privacy policy, version).
+  - Belt: a switcher with three views. **Relocate** (survey points, the bonus you gain, what you lose, the Relocate button with a confirm tap), **Cosmetics** (skins, 3.14) and **Settings** (sound, music, vibration, how to play, reminders on Android, ad privacy choices when required, wipe save with a confirm tap, Privacy policy, version).
   - Captain's log: the Captain's journal (10 chapters unlocking with lifetime ore) and the logbook of stats and rank.
   - Shop: optional purchases through Google Play.
 - **Overlays:** a four-card how-to-play (first launch, and again from Settings), the Captain's journal, the in-app privacy policy (the same text as the hosted page), the welcome-back summary, and the splash.
@@ -296,7 +297,7 @@ Fonts: **Big Shoulders Display** (headings, uppercase, letter-spaced), **IBM Ple
 ## 5. Save data
 
 - Key `oredrift.v1`, one JSON object. Save every 5 seconds, when the app goes to the background, and after every purchase or claim.
-- Fields: `ore, total, allTime, taps, points, runs, owned{id:count}, ups{id:true}, last (ms), sound, music, haptics, notify, ach{id:true}, gifts{achId:ore}, stats{comets, missions, best, ships, drops, chests, capped, night, bare, bestRun, overdrive, played, peak, ducks}, streak, lastSupply ("YYYY-MM-DD"), daily{day, missions[{type,target,progress,claimed}], chest, swaps}, weekly{week, missions[...], swaps}, frenzyUntil (ms), podReadyAt (ms), iap{removeAds, starter, boost}, granted[order ids], journalSeen, tutorial, spent, skins{id:true}, look{rock, fleet, sky}`.
+- Fields: `ore, total, allTime, taps, points, power, runs, owned{id:count}, ups{id:true}, last (ms), sound, music, haptics, notify, ach{id:true}, gifts{achId:ore}, stats{comets, missions, best, ships, drops, chests, capped, night, bare, bestRun, overdrive, played, peak, ducks}, streak, lastSupply ("YYYY-MM-DD"), daily{day, missions[{type,target,progress,claimed}], chest, swaps}, weekly{week, missions[...], swaps}, frenzyUntil (ms), podReadyAt (ms), iap{removeAds, starter, boost}, granted[order ids], journalSeen, tutorial, spent, skins{id:true}, look{rock, fleet, sky}`.
 - On load, validate everything: numbers must be finite and non-negative, unknown ids dropped, `daily.missions` and `weekly.missions` must have exactly 3 valid entries, `spent` can never exceed `points`, only owned skins of the right slot can be worn, `gifts` only for earned commendations, `lastSupply` must match `\d{4}-\d{2}-\d{2}`. A corrupt save must never crash the game; fall back to defaults for the bad field.
 - Days use the device's local date. If the saved `daily.day` is not today, generate new missions; if `weekly.week` is not this week's Monday, generate new weekly missions.
 - An older save that lacks newer fields loads with their defaults. A save that already has progress counts as having seen the tutorial.

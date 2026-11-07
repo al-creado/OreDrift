@@ -5,8 +5,8 @@ export const MILESTONES = [10, 25, 50, 100, 150, 200];
 export const OFFLINE_CAP = 8 * 3600;
 export const OFFLINE_RATE = 0.5;
 export const PRESTIGE_BASE = 1e6;
-/* Each survey point you hold makes the next ones dearer, so a stronger fleet cannot spam relocations:
-   one point costs PRESTIGE_BASE * (1 + points / PRESTIGE_GROWTH_DIV) ^ PRESTIGE_GROWTH_POW ore in a run. */
+/* Each survey bonus step you hold makes the next ones dearer, so a stronger fleet cannot spam relocations:
+   one bonus step costs PRESTIGE_BASE * (1 + steps / PRESTIGE_GROWTH_DIV) ^ PRESTIGE_GROWTH_POW ore in a run. */
 export const PRESTIGE_GROWTH_DIV = 10;
 export const PRESTIGE_GROWTH_POW = 3;
 export const FRENZY_MULT = 7;
@@ -49,7 +49,7 @@ export const TAP_TARGETS = [150, 250, 400];
 
 /*
  * Commendations. `stat` names a value computed by logic.js (statValue).
- * stat: taps | tapPower | night | allTime | heldOre | rate | fleet | kinds | maxVessel | upgrades | runs | bare | points |
+ * stat: taps | tapPower | night | allTime | heldOre | rate | fleet | kinds | maxVessel | upgrades | runs | bare | power |
  *       comets | ships | cometsOnly | bestRun | overdrive | missions | chests | best | drops | capped | achs
  * group: the category shown in the Goals tab. tier: 1 Bronze, 2 Silver, 3 Gold, 4 and up Platinum.
  * bonus: permanent output and tap bonus; the original 32 give +1%, newer ones +0.5%. secret: hidden until earned.
@@ -118,11 +118,11 @@ export const ACHS = [
   ach('rb1', 'Belts', 2, 'Ringed World', 'Reach a belt with a ring.', 2, 'runs', { ...NEW, secret: true }),
   ach('rb2', 'Belts', 3, 'Full Spectrum', 'Visit all 8 kinds of belt.', 7, 'runs', { ...NEW, secret: true }),
   ach('br1', 'Belts', 2, 'Bare Hands', 'Relocate without installing a single upgrade.', 1, 'bare', { ...NEW, secret: true }),
-  // Survey points
-  ach('sv1', 'Survey', 1, 'Surveyor', 'Hold 10 survey points.', 10, 'points', NEW),
-  ach('sv2', 'Survey', 2, 'Cartographer', 'Hold 50 survey points.', 50, 'points', NEW),
-  ach('sv3', 'Survey', 3, 'Cosmographer', 'Hold 200 survey points.', 200, 'points', NEW),
-  ach('sv4', 'Survey', 4, 'Belt Whisperer', 'Hold 1,000 survey points.', 1000, 'points', NEW),
+  // Survey bonus
+  ach('sv1', 'Survey', 1, 'Surveyor', 'Reach a +100% survey bonus.', 10, 'power', NEW),
+  ach('sv2', 'Survey', 2, 'Cartographer', 'Reach a +500% survey bonus.', 50, 'power', NEW),
+  ach('sv3', 'Survey', 3, 'Cosmographer', 'Reach a +2,000% survey bonus.', 200, 'power', NEW),
+  ach('sv4', 'Survey', 4, 'Belt Whisperer', 'Reach a +10,000% survey bonus.', 1000, 'power', NEW),
   // Flyers
   ach('c1', 'Flyers', 1, 'Sky Watcher', 'Catch a comet or supply ship.', 1, 'comets'),
   ach('c2', 'Flyers', 2, 'Comet Hunter', 'Catch 25 comets or supply ships.', 25, 'comets'),
@@ -191,7 +191,7 @@ export const CHAIN_IDS = {
 export const CHAIN_TITLES = {
   taps: 'Tapping', tapPower: 'Tap power', ore: 'Lifetime ore', hoard: 'Hoard', output: 'Output rate', sleeper: 'Time away',
   fleet: 'Fleet size', kinds: 'Vessel kinds', specialist: 'One kind', upgrades: 'Upgrades', relocations: 'Relocations',
-  ringed: 'Rings', spectrum: 'Spectrum', survey: 'Survey points', flyers: 'Flyers caught', ships: 'Supply ships',
+  ringed: 'Rings', spectrum: 'Spectrum', survey: 'Survey bonus', flyers: 'Flyers caught', ships: 'Supply ships',
   comets: 'Comets', nightowl: 'Night owl', barehands: 'Bare hands', eagleeye: 'Eagle eye', overdrive: 'Overdrive', missions: 'Missions', caches: 'Daily caches', streak: 'Supply streak', drops: 'Supply drops', collection: 'Collection',
 };
 for (const [chain, ids] of Object.entries(CHAIN_IDS)) {
@@ -217,7 +217,7 @@ export const GRANTED_KEEP = 50;
 
 /*
  * Cosmetic skins, bought with spare survey points. They change how the game looks and nothing else: the survey
- * bonus keeps counting every point ever earned, and spending only moves points from "to spend" to "spent".
+ * bonus (a separate number, S.power) is untouched, and spending only moves points from "to spend" to "spent".
  * slot: where it applies. rock skins either borrow a belt's colour scheme (belt: index into BELTS) or bring their own.
  * An empty look id ('') is the default for that slot.
  */

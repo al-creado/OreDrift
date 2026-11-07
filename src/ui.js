@@ -312,7 +312,7 @@ export function createUI(h) {
   function updateSkins(s) {
     const spare = L.spendablePoints(s);
     setText($('skin-pts'), String(spare));
-    setText($('skin-note'), 'Skins are bought with survey points and only change how the game looks. Spending survey points on them never lowers your bonus, and every point still counts for output.');
+    setText($('skin-note'), 'Skins are bought with survey points, 1 for every relocation. They only change how the game looks, and spending points never lowers your bonus.');
     skinEls.forEach((c) => {
       const k = c.skin, worn = k.id ? L.wornSkin(s, k.slot) === k : !L.wornSkin(s, k.slot);
       const owned = !k.id || L.owns_skin(s, k.id);
@@ -350,7 +350,7 @@ export function createUI(h) {
 
   function updateBelt(s) {
     if (activeTab !== 'belt') return;
-    $('bs-relocate').hidden = L.prestigeGain(s) < 1;           // a survey point is waiting
+    $('bs-relocate').hidden = L.prestigeGain(s) < 1;           // a relocation is ready
     const pv = L.relocatePreview(s), g = pv.gain;
     setText($('pts'), String(s.points));
     updateSkins(s);
@@ -359,10 +359,10 @@ export function createUI(h) {
 
     // What relocating gives (and costs), spelled out.
     setText($('rl-gain'), g >= 1
-      ? '+' + g + ' survey point' + (g > 1 ? 's' : '') + ': everything you earn ×' + pv.ratio.toFixed(2)
+      ? '+1 survey point, and everything you earn ×' + pv.ratio.toFixed(2)
       : 'Not yet: ' + L.fmt(Math.max(0, pv.nextAt - s.total)) + ' t to go');
     setFill($('rl-fill'), pv.progress * 100);
-    setText($('relnote'), (g >= 1 ? 'The next survey point' : 'Your first survey point') + ' comes at ' + L.fmt(pv.nextAt) + ' t this run (' + L.fmt(s.total) + ' so far). The bar shows the way there.');
+    setText($('relnote'), (g >= 1 ? 'More bonus' : 'Your first bonus') + ' comes at ' + L.fmt(pv.nextAt) + ' t this run (' + L.fmt(s.total) + ' so far). The bar shows the way there.');
     $('rl-detail').hidden = g < 1;
     setText($('rl-pts'), pv.pointsBefore + ' → ' + pv.pointsAfter);
     setText($('rl-sb'), '+' + pct(pv.surveyBefore) + ' → +' + pct(pv.surveyAfter));

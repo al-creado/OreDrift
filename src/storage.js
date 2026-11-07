@@ -29,6 +29,7 @@ export function parseSave(raw, now = Date.now()) {
   S.allTime = Math.max(num(d.allTime, 0), S.total);
   S.taps = int(d.taps, 0);
   S.points = int(d.points, 0);
+  S.power = d.power === undefined ? S.points : int(d.power, 0); // a save from before the split: every point was one bonus step
   S.runs = int(d.runs, 0);
   // A save from the future (clock changed) must not produce negative time away.
   S.last = Math.min(num(d.last, now), now);

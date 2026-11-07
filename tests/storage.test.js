@@ -135,6 +135,14 @@ describe('parseSave', () => {
     expect(parse(goodSave()).stats.ducks).toBe(0);
   });
 
+  it('survey bonus (power): an old save keeps its bonus, a new one reads its own, junk becomes 0', () => {
+    expect(parse({ ...goodSave(), points: 7 }).power).toBe(7);                 // saved before the split: every point was a bonus step
+    expect(parse({ ...goodSave(), points: 7, power: 40 })).toMatchObject({ points: 7, power: 40 });
+    expect(parse({ ...goodSave(), points: 7, power: 'lots' }).power).toBe(0);
+    expect(parse({ ...goodSave(), points: 7, power: -4 }).power).toBe(0);
+    expect(parse(serializeState(parse({ ...goodSave(), points: 3, power: 12 }), NOW)).power).toBe(12);
+  });
+
   it('wrong container types are ignored, not fatal', () => {
     const S = parse({ ...goodSave(), owned: [1, 2], ups: 'x', ach: 5, stats: null, daily: 'x' });
     expect(S.owned).toEqual({});

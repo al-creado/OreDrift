@@ -169,7 +169,7 @@ describe('output and tap formulas', () => {
   });
 
   it('survey points add 10% each and commendations 1% each', () => {
-    const S = state({ owned: { laser: 10 }, points: 3 });
+    const S = state({ owned: { laser: 10 }, power: 3 });
     S.ach = { t1: true, t2: true, o1: true, f1: true, c1: true };
     expect(L.surveyMult(S)).toBeCloseTo(1.3, 9);
     expect(L.achMult(S)).toBeCloseTo(1.05, 9);
@@ -190,7 +190,7 @@ describe('output and tap formulas', () => {
   });
 
   it('with every upgrade, survey points and commendations', () => {
-    const S = state({ points: 2, ups: Object.fromEntries(UPS.slice(0, 9).map((x) => [x.id, true])), owned: { drone: 10 } }); // the original nine
+    const S = state({ power: 2, ups: Object.fromEntries(UPS.slice(0, 9).map((x) => [x.id, true])), owned: { drone: 10 } }); // the original nine
     S.ach = { t1: true, t2: true };
     const o = L.ops(S);
     // output: 10*0.1*2 = 2, tunes 1.25*1.5*2 = 3.75, survey 1.2, ach 1.02
@@ -234,26 +234,26 @@ describe('survey points and relocate', () => {
     expect(L.nextPointAt(state({ total: 0 }))).toBe(1e6);
   });
   it('points get dearer the more you hold, so relocating cannot be spammed', () => {
-    expect(L.pointCost(state({ points: 0 }))).toBe(1e6);
-    expect(L.pointCost(state({ points: 10 }))).toBeCloseTo(8e6, 3);        // (1 + 10/10)^3
-    expect(L.pointCost(state({ points: 99 }))).toBeCloseTo(1e6 * 10.9 ** 3, 0);
-    // with 10 points a run that mined 1M earns nothing now; it needs 8M for the first point
-    expect(L.prestigeGain(state({ points: 10, total: 1e6 }))).toBe(0);
-    expect(L.prestigeGain(state({ points: 10, total: 8e6 }))).toBe(1);
-    expect(L.prestigeGain(state({ points: 10, total: 32e6 }))).toBe(2);
-    expect(L.nextPointAt(state({ points: 10, total: 8e6 }))).toBe(32e6);
-    const pv = L.relocatePreview(state({ points: 10, total: 8e6 }));
+    expect(L.pointCost(state({ power: 0 }))).toBe(1e6);
+    expect(L.pointCost(state({ power: 10 }))).toBeCloseTo(8e6, 3);        // (1 + 10/10)^3
+    expect(L.pointCost(state({ power: 99 }))).toBeCloseTo(1e6 * 10.9 ** 3, 0);
+    // with 10 bonus steps a run that mined 1M earns nothing now; it needs 8M for the first step
+    expect(L.prestigeGain(state({ power: 10, total: 1e6 }))).toBe(0);
+    expect(L.prestigeGain(state({ power: 10, total: 8e6 }))).toBe(1);
+    expect(L.prestigeGain(state({ power: 10, total: 32e6 }))).toBe(2);
+    expect(L.nextPointAt(state({ power: 10, total: 8e6 }))).toBe(32e6);
+    const pv = L.relocatePreview(state({ power: 10, total: 8e6 }));
     expect(pv.gain).toBe(1); expect(pv.nextAt).toBe(32e6); expect(pv.progress).toBe(0);
   });
 
   it('previews what relocating would do without changing anything', () => {
     const cost = 1e6 * 1.2 ** 3; // 2 points held -> each new point costs 1.728M
-    const S = state({ points: 2, total: 8e6, ore: 1234, owned: { drone: 3, laser: 4 }, ups: { bits: true, tune1: true } });
+    const S = state({ points: 2, power: 2, total: 8e6, ore: 1234, owned: { drone: 3, laser: 4 }, ups: { bits: true, tune1: true } });
     const before = JSON.stringify(S);
     const p = L.relocatePreview(S);
     expect(JSON.stringify(S)).toBe(before);
     expect(p.gain).toBe(2);
-    expect(p).toMatchObject({ pointsBefore: 2, pointsAfter: 4 });
+    expect(p).toMatchObject({ pointsBefore: 2, pointsAfter: 3 }); // one survey point, though the bonus grows by two steps
     expect(p.nextAt).toBeCloseTo(9 * cost, 3);
     expect(p.surveyBefore).toBeCloseTo(0.2, 9);
     expect(p.surveyAfter).toBeCloseTo(0.4, 9);
@@ -265,13 +265,25 @@ describe('survey points and relocate', () => {
   });
 
   it('the preview matches what relocating really gives', () => {
-    const S = state({ points: 3, total: 9e6, owned: { laser: 10 }, ach: { t1: true }, iap: { removeAds: false, starter: false, boost: true } });
+    const S = state({ points: 3, power: 3, total: 9e6, owned: { laser: 10 }, ach: { t1: true }, iap: { removeAds: false, starter: false, boost: true } });
     const p = L.relocatePreview(S), opsBefore = L.ops(S);
     L.relocate(S);
     S.owned = { laser: 10 };
     expect(S.points).toBe(p.pointsAfter);
     expect(L.achMult(S) * L.iapMult(S) * L.surveyMult(S) - 1).toBeCloseTo(p.bonusAfter, 9);
     expect(L.ops(S) / opsBefore).toBeCloseTo(p.ratio, 9);
+  });
+
+  it('always gives exactly 1 survey point, however big the run; the bonus is what grows', () => {
+    const small = state({ total: 1e6 }), huge = state({ total: 1e12 });
+    const gs = L.relocate(small), gh = L.relocate(huge);
+    expect(gs).toBe(1); expect(gh).toBe(1000);            // bonus steps: floor(sqrt(total / 1M))
+    expect(small.points).toBe(1); expect(huge.points).toBe(1);
+    expect(small.power).toBe(1); expect(huge.power).toBe(1000);
+    expect(L.surveyMult(huge)).toBeCloseTo(1 + 0.1 * 1000, 9);
+    const pv = L.relocatePreview(state({ total: 1e12 }));
+    expect(pv.pointsAfter - pv.pointsBefore).toBe(1);
+    expect(L.relocatePreview(state({ total: 1e5 })).pointsAfter).toBe(0); // nothing to relocate yet: no point
   });
 
   it('preview with no points yet shows progress toward the first one', () => {
@@ -284,7 +296,7 @@ describe('survey points and relocate', () => {
   });
 
   it('includes commendations and the shop boost in the total bonus', () => {
-    const S = state({ points: 1, total: 2e6, ach: { t1: true, sh1: true }, iap: { removeAds: false, starter: false, boost: true } });
+    const S = state({ points: 1, power: 1, total: 2e6, ach: { t1: true, sh1: true }, iap: { removeAds: false, starter: false, boost: true } });
     const p = L.relocatePreview(S);
     const other = 1.015 * 1.25;
     expect(p.bonusBefore).toBeCloseTo(1.1 * other - 1, 9);
@@ -300,7 +312,7 @@ describe('survey points and relocate', () => {
 
   it('resets the run and keeps permanent progress', () => {
     const S = state({
-      ore: 1e6, total: 16e6, allTime: 5e7, taps: 123, points: 2, runs: 1,
+      ore: 1e6, total: 16e6, allTime: 5e7, taps: 123, points: 2, power: 2, runs: 1,
       owned: { drone: 40 }, ups: { bits: true }, sound: false, streak: 4, lastSupply: '2026-01-02',
       frenzyUntil: NOW + 1000,
     });
@@ -308,7 +320,7 @@ describe('survey points and relocate', () => {
     S.stats = { comets: 5, missions: 6, best: 7 };
     S.daily = { day: '2026-01-02', chest: true, missions: [] };
     expect(L.relocate(S)).toBe(3);
-    expect(S).toMatchObject({ ore: 0, total: 0, owned: {}, ups: {}, points: 5, runs: 2 });
+    expect(S).toMatchObject({ ore: 0, total: 0, owned: {}, ups: {}, points: 3, power: 5, runs: 2 }); // +1 survey point, +3 bonus steps
     expect(S).toMatchObject({ allTime: 5e7, taps: 123, sound: false, streak: 4, lastSupply: '2026-01-02' });
     expect(S.ach).toEqual({ t1: true });
     expect(S.stats).toEqual({ comets: 5, missions: 6, best: 7 });
@@ -721,7 +733,7 @@ describe('commendations', () => {
       case 'allTime': S.allTime = v; break;
       case 'heldOre': S.ore = v; break;
       case 'runs': S.runs = v; break;
-      case 'points': S.points = v; break;
+      case 'power': S.power = v; break;
       case 'comets': S.stats.comets = v; break;
       case 'ships': S.stats.ships = v; S.stats.comets = v; break;
       case 'cometsOnly': S.stats.comets = v; S.stats.ships = 0; break;
@@ -861,7 +873,7 @@ describe('commendations', () => {
     it('Heavy Hand needs a tap worth 100 t', () => {
       const S = state({ ups: { bits: true, plasma: true, hammer: true, pulse: true } });
       expect(L.checkAch(S).map((x) => x.id)).not.toContain('tp1'); // 60 t
-      S.points = 7; // 60 x 1.7 = 102
+      S.power = 7; // 60 x 1.7 = 102
       expect(L.checkAch(S).map((x) => x.id)).toContain('tp1');
     });
     it('uplinks count, so a huge fleet makes huge taps', () => {
@@ -1643,7 +1655,7 @@ describe('save-shape defaults', () => {
       expect(L.buySkin(S, 'nope')).toBe(false);
     });
     it('is purely cosmetic: spending points never changes output or the survey bonus', () => {
-      const S = state({ points: 12, owned: { laser: 10 } });
+      const S = state({ points: 12, power: 12, owned: { laser: 10 } });
       const before = { ops: L.ops(S), tap: L.tapValue(S, 0, L.ops(S)), mult: L.surveyMult(S), prev: L.relocatePreview(S).bonusBefore };
       L.buySkin(S, rock().id); L.buySkin(S, pricey().id);
       expect(S.spent).toBeGreaterThan(0);
@@ -1663,19 +1675,18 @@ describe('save-shape defaults', () => {
       expect(f).toBeTruthy();
     });
     it('survives relocating, and new points can be spent', () => {
-      const S = state({ points: 2, total: 5e6 });
+      const S = state({ points: 2, power: 2, total: 5e6 });
       L.buySkin(S, rock().id);
-      const gained = L.relocate(S);
-      expect(gained).toBeGreaterThan(0);
+      expect(L.relocate(S)).toBeGreaterThan(0);
       expect(S.skins[rock().id]).toBe(true); expect(S.spent).toBe(2);
-      expect(L.spendablePoints(S)).toBe(gained);
+      expect(L.spendablePoints(S)).toBe(1); // 3 points earned, 2 spent
     });
   });
 
   it('fresh state has the documented fields', () => {
     const S = L.fresh(42);
     expect(Object.keys(S).sort()).toEqual(['ach', 'allTime', 'daily', 'frenzyUntil', 'gifts', 'haptics', 'last', 'lastSupply', 'owned',
-      'granted', 'iap', 'journalSeen', 'music', 'notify', 'podReadyAt', 'points', 'ore', 'runs', 'skins', 'look', 'spent', 'tutorial', 'sound', 'stats', 'streak', 'taps', 'total', 'ups', 'weekly'].sort());
+      'granted', 'iap', 'journalSeen', 'music', 'notify', 'podReadyAt', 'points', 'power', 'ore', 'runs', 'skins', 'look', 'spent', 'tutorial', 'sound', 'stats', 'streak', 'taps', 'total', 'ups', 'weekly'].sort());
     expect(S.last).toBe(42);
     expect(S.sound).toBe(true);
   });
