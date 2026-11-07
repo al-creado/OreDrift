@@ -229,6 +229,7 @@ function setRetroMode(on) {
 }
 function startRetro() {
   const now = Date.now(), was = retroUntil > now;
+  L.noteRetro(S); // the "Old School" commendation
   retroUntil = now + RETRO_MS;
   if (!was) setRetroMode(true);
   ui.toast('8-BIT MODE! Sixty seconds of pixels.', 3500);

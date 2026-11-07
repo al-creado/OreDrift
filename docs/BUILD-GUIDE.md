@@ -1,6 +1,6 @@
 # Ore Drift: build and publish guide for Android
 
-> This started as the guide the project was built from. It was moved here from the repository's front-page README. Where it says "README.md", read "this file". **Updated Nov 2026 (version 1.4.0):** sections 3 to 5 and 8 to 11 now describe the game as it is today (15 upgrades, flyers, weekly missions, 71 commendations, skins, the relocate cost, the save format). Sections 1, 2, 6, 7 and 9 are still the original build instructions, with small corrections. For the current state of the project see the main [README](../README.md).
+> This started as the guide the project was built from. It was moved here from the repository's front-page README. Where it says "README.md", read "this file". **Updated Nov 2026 (version 1.4.0):** sections 3 to 5 and 8 to 11 now describe the game as it is today (15 upgrades, flyers, weekly missions, 72 commendations, skins, the relocate cost, the save format). Sections 1, 2, 6, 7 and 9 are still the original build instructions, with small corrections. For the current state of the project see the main [README](../README.md).
 
 Ore Drift is a space-mining idle clicker. You tap an asteroid, hire auto-miners, install upgrades, catch comets, finish daily missions, and relocate to richer belts for permanent bonuses.
 
@@ -138,7 +138,7 @@ ops (ore/s)   = vesselOutput * prodMult * (frenzy ? 7 : 1)
 tapValue      = (product of owned "tap" upgrades) * surveyMult * achMult * iapMult * (frenzy ? 7 : 1)
                 + ops * (sum of owned "uplink" fractions)
 surveyMult    = 1 + 0.10 * surveyPower   // power = the bonus steps earned by relocating (S.power)
-achMult       = 1 + (sum of the bonus of every commendation earned)   // 1% each for the original 32, 0.5% each for the 39 added later
+achMult       = 1 + (sum of the bonus of every commendation earned)   // 1% each for the original 32, 0.5% each for the 40 added later
 iapMult       = 1.25 once the Prospector boost has been bought (shop), else 1
 ```
 
@@ -208,12 +208,12 @@ Three missions per local day, plus a cache. Missions are generated from the date
 
 ### 3.11 Commendations (achievements)
 
-71 in 26 chains. A chain is one tile with up to five tiers (Bronze, Silver, Gold, Platinum, and a top one for a few). Earning a tier:
-- gives a permanent bonus to all output and taps and survives relocation: +1% each for the original 32, +0.5% each for the 39 added later;
+72 in 27 chains. A chain is one tile with up to five tiers (Bronze, Silver, Gold, Platinum, and a top one for a few). Earning a tier:
+- gives a permanent bonus to all output and taps and survives relocation: +1% each for the original 32, +0.5% each for the 40 added later;
 - shows the commendation banner (it does **not** pay anything by itself);
 - sets aside a one-time **ore gift** (3, 8, 20 or 45 minutes of current output by tier, at least 250 / 600 / 1,500 / 4,000 t) that the player claims on the Goals tab, one chain at a time or all at once. The amount is fixed when the tier is earned.
 
-They are checked continuously. The number earned sets the rank: Rookie 0, Prospector 5, Miner 12, Foreman 20, Baron 32, Tycoon 45, Legend 58. Eight chains are secret and show as "???" until their first tier is earned.
+They are checked continuously. The number earned sets the rank: Rookie 0, Prospector 5, Miner 12, Foreman 20, Baron 32, Tycoon 45, Legend 58. Nine chains are secret. They are not shown at all until earned (no placeholder tile), and the total number of commendations is hidden too: the Goals tab and the logbook show just the number earned until every secret one has been found, and only then "N / 72".
 
 | Group | Chains (tier thresholds) |
 |---|---|
@@ -227,7 +227,7 @@ They are checked continuously. The number earned sets the rank: Rookie 0, Prospe
 | Flyers | Flyers caught (1, 25, 100), Supply ships (10, 50, 200), Comets (10, 50, 200), Eagle eye and Overdrive (secret) |
 | Missions | Missions done (3, 30, 100), Daily caches (1, 7, 30) |
 | Supply | Best supply streak (3, 7, 30 days), Supply drops claimed (10, 50, 150) |
-| Collection | Commendations earned (10, 25, 45) |
+| Collection | Commendations earned (10, 25, 45), Old School (secret) |
 
 Locked ones show a progress bar and "value / target". The list has three views: by type (all chains, grouped), next up (closest to done) and earned.
 
@@ -250,7 +250,7 @@ Costs are constants in `src/data.js` (`SKINS`).
 ### 3.15 Easter eggs
 
 - **Rubber duck:** 3% of flyers. It pays 30 to 60 minutes of output (at least 2,000 t) and a 20 second x7 boost, quacks, and counts as a flyer caught. A hidden "Rubber ducks" line appears in the logbook after the first.
-- **8-bit mode:** swipe up, up, down, down, left, right, left, right on the asteroid, then tap twice (keyboard: arrow keys, then B and A; at most 3 seconds between steps). For 60 seconds the canvas is drawn at low resolution and scaled up with hard pixels, the UI gets a pixel font, square corners and scanlines, and sound effects become square waves. It is never saved.
+- **8-bit mode:** swipe up, up, down, down, left, right, left, right on the asteroid, then tap twice (keyboard: arrow keys, then B and A; at most 3 seconds between steps). For 60 seconds the canvas is drawn at low resolution and scaled up with hard pixels, the UI gets a pixel font, square corners and scanlines, and sound effects become square waves. It is never saved, but switching it on earns the secret "Old School" commendation. Chapter 9 of the Captain's journal has a cryptic clue to the code.
 
 
 ---

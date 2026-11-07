@@ -11,7 +11,7 @@ It is a Vite and vanilla JavaScript game wrapped for Android with Capacitor. It 
 
 - **Mining:** tap the asteroid, hire 7 kinds of vessels (they mine while you are away, up to 8 hours at half rate), install 15 upgrades.
 - **Flyers:** comets give a pile of ore, supply ships give a temporary x7 output boost.
-- **Goals tab:** a 7-day supply streak, daily and weekly missions (a mission you do not like can be swapped), the daily cache, and 71 commendations in tiered chains with secrets. Each commendation gives a permanent bonus at once, and a one-time ore gift that the player claims.
+- **Goals tab:** a 7-day supply streak, daily and weekly missions (a mission you do not like can be swapped), the daily cache, and 72 commendations in tiered chains, nine of them secret. Secret ones are not shown at all until they are earned, and the total count stays hidden until every secret one is found. Each commendation gives a permanent bonus at once, and a one-time ore gift that the player claims.
 - **Belt tab:** Relocate resets the run and gives exactly **1 survey point** (the currency for skins) plus a permanent **survey bonus** that grows with how much you mined in the run (`floor(sqrt(ore / cost))` steps of +10% output and taps, kept forever). The cost of a step grows with the steps already held: `1,000,000 * (1 + steps / 10) ^ 3` ore in a run, so relocating cannot be spammed. Cosmetics: skins for the asteroid, the fleet and the sky, bought with survey points (spending them never lowers the bonus). Settings: sound, music, vibration, reminders, how to play, and the privacy policy (shown inside the app).
 - **Captain's log tab:** the Captain's journal (10 chapters that unlock as you play) and the logbook of stats.
 - **Extras:** weekly events, a welcome-back summary, a four-card tutorial for new players, local reminders, synthesized music and sound effects.
@@ -20,7 +20,7 @@ It is a Vite and vanilla JavaScript game wrapped for Android with Capacitor. It 
 ## Easter eggs (spoilers)
 
 - **Rubber duck:** a rare flyer (about 1 in 33). It pays 30 to 60 minutes of output plus a 20 second x7 boost, quacks, and counts as a flyer caught. A "Rubber ducks" line appears in the logbook after the first one. Rules are in `logic.js` (`DUCK_*`, `catchDuck`), the drawing in `scene.js`, the quack in `audio.js`.
-- **8-bit mode:** on the asteroid, swipe up, up, down, down, left, right, left, right, then tap twice (on a keyboard: the arrow keys, then B and A). The game turns into pixels for 60 seconds: the canvas is drawn at low resolution, the UI gets a pixel font, hard edges and scanlines, and sounds become square waves. Matching is in `logic.js` (`feedSecretCode`); the mode is wired in `main.js` and styled under `html.retro` in `style.css`. Nothing in it is saved.
+- **8-bit mode:** on the asteroid, swipe up, up, down, down, left, right, left, right, then tap twice (on a keyboard: the arrow keys, then B and A). The game turns into pixels for 60 seconds: the canvas is drawn at low resolution, the UI gets a pixel font, hard edges and scanlines, and sounds become square waves. Matching is in `logic.js` (`feedSecretCode`); the mode is wired in `main.js` and styled under `html.retro` in `style.css`. Nothing in it is saved, but switching it on earns the secret **Old School** commendation, and chapter 9 of the Captain's journal holds a cryptic clue to the code (data.js, `JOURNAL`).
 
 ## Run it in a browser
 

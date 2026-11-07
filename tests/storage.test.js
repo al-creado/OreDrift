@@ -25,7 +25,7 @@ describe('parseSave', () => {
     expect(S.ups).toEqual({ bits: true });
     expect(S.ach).toEqual({ t1: true });
     expect(S.gifts).toEqual({ t1: 250 });
-    expect(S.stats).toEqual({ comets: 3, missions: 4, best: 5, ships: 2, drops: 6, chests: 1, capped: 1, night: 0, bare: 0, bestRun: 0, overdrive: 0, played: 0, peak: 0, ducks: 0 });
+    expect(S.stats).toEqual({ comets: 3, missions: 4, best: 5, ships: 2, drops: 6, chests: 1, capped: 1, night: 0, bare: 0, bestRun: 0, overdrive: 0, played: 0, peak: 0, ducks: 0, retro: 0 });
     expect(S.daily.missions).toHaveLength(3);
     expect(S.daily.chest).toBe(true);
     expect(parse(serializeState(S, NOW))).toEqual({ ...S, last: NOW });
@@ -129,6 +129,12 @@ describe('parseSave', () => {
     expect(fresh(NOW).tutorial).toBe(false);
   });
 
+  it('8-bit mode count is read, and an older save has none', () => {
+    expect(parse({ ...goodSave(), stats: { retro: 3 } }).stats.retro).toBe(3);
+    expect(parse({ ...goodSave(), stats: { retro: -2 } }).stats.retro).toBe(0);
+    expect(parse(goodSave()).stats.retro).toBe(0);
+  });
+
   it('ducks caught is read, and an older save has none', () => {
     expect(parse({ ...goodSave(), stats: { comets: 9, ducks: 4 } }).stats.ducks).toBe(4);
     expect(parse({ ...goodSave(), stats: { ducks: -3 } }).stats.ducks).toBe(0);
@@ -148,7 +154,7 @@ describe('parseSave', () => {
     expect(S.owned).toEqual({});
     expect(S.ups).toEqual({});
     expect(S.ach).toEqual({});
-    expect(S.stats).toEqual({ comets: 0, missions: 0, best: 0, ships: 0, drops: 0, chests: 0, capped: 0, night: 0, bare: 0, bestRun: 0, overdrive: 0, played: 0, peak: 0, ducks: 0 });
+    expect(S.stats).toEqual({ comets: 0, missions: 0, best: 0, ships: 0, drops: 0, chests: 0, capped: 0, night: 0, bare: 0, bestRun: 0, overdrive: 0, played: 0, peak: 0, ducks: 0, retro: 0 });
     expect(S.daily).toBeNull();
   });
 
@@ -188,7 +194,7 @@ describe('parseSave', () => {
 
   it('an older save without the newer stats gets zeros, and ships never exceed flyers caught', () => {
     const old = parse({ ...goodSave(), stats: { comets: 7, missions: 2, best: 3 } });
-    expect(old.stats).toEqual({ comets: 7, missions: 2, best: 3, ships: 0, drops: 0, chests: 0, capped: 0, night: 0, bare: 0, bestRun: 0, overdrive: 0, played: 0, peak: 0, ducks: 0 });
+    expect(old.stats).toEqual({ comets: 7, missions: 2, best: 3, ships: 0, drops: 0, chests: 0, capped: 0, night: 0, bare: 0, bestRun: 0, overdrive: 0, played: 0, peak: 0, ducks: 0, retro: 0 });
     expect(parse({ ...goodSave(), stats: { comets: 3, ships: 50 } }).stats.ships).toBe(3);
     expect(parse({ ...goodSave(), stats: { comets: 3, ships: -4, drops: 'x', chests: NaN } }).stats).toMatchObject({ ships: 0, drops: 0, chests: 0 });
   });

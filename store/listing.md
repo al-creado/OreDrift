@@ -19,7 +19,7 @@ Pick one. Lengths are checked. Number 4 is the suggested one.
 
 ## Full description (about 2,000 of 4,000 characters)
 
-Plain text on purpose: Play does not show Markdown, so asterisks would appear as asterisks. Update the counts (upgrades, commendations) if you add content, and add a line about purchases when the shop is switched on.
+Plain text on purpose: Play does not show Markdown, so asterisks would appear as asterisks. Update the upgrade count if you add content. Do not put the number of commendations here: the game hides the total (and the secret ones) on purpose, and add a line about purchases when the shop is switched on.
 
 ```
 Tap a glowing asteroid and start mining. Hire drones, laser rigs and orbital foundries to dig while you are away, then move on to richer belts for permanent bonuses.
@@ -32,7 +32,7 @@ WHAT YOU DO
 • Collect a daily supply drop. Come back on consecutive days for bigger rewards.
 • Finish daily and weekly missions, swap the ones you don't like, then open the daily cache.
 • Join weekly events that send more comets and supply ships your way.
-• Earn 71 commendations from Bronze to Platinum, with eight secret ones to discover, and rise in rank from Rookie to Legend.
+• Earn commendations from Bronze to Platinum and rise in rank from Rookie to Legend.
 • Read the Captain's journal, a story of the Drift that unlocks chapter by chapter.
 • Relocate to a new belt for a permanent bonus to all output and taps, plus a survey point to spend. The more you mined, the bigger the bonus.
 • Spend survey points on skins for your asteroid, your fleet and the sky. They only change the look, so your bonus never goes down.

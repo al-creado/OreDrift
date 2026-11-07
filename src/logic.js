@@ -60,7 +60,7 @@ export function fresh(now = 0) {
   return {
     ore: 0, total: 0, allTime: 0, taps: 0, points: 0, power: 0, runs: 0, // points: survey points (exactly 1 per relocation, spent on skins). power: survey bonus steps, each +10% output
     owned: {}, ups: {}, last: now, sound: true, music: true, haptics: true, ach: {},
-    stats: { comets: 0, missions: 0, best: 0, ships: 0, drops: 0, chests: 0, capped: 0, night: 0, bare: 0, bestRun: 0, overdrive: 0, played: 0, peak: 0, ducks: 0 },
+    stats: { comets: 0, missions: 0, best: 0, ships: 0, drops: 0, chests: 0, capped: 0, night: 0, bare: 0, bestRun: 0, overdrive: 0, played: 0, peak: 0, ducks: 0, retro: 0 },
     streak: 0, lastSupply: '', daily: null, weekly: null, frenzyUntil: 0, notify: false, podReadyAt: 0,
     iap: { removeAds: false, starter: false, boost: false }, granted: [], journalSeen: 0,
     gifts: {}, // commendation id -> ore gift waiting to be claimed
@@ -79,6 +79,8 @@ export function milestoneMult(n) {
 }
 export const surveyMult = (S) => 1 + SURVEY_BONUS * S.power;
 export const achCount = (S) => ACHS.reduce((a, x) => a + (S.ach[x.id] ? 1 : 0), 0);
+/** True once every secret commendation has been earned. Until then the total number of commendations is not shown. */
+export const secretsDone = (S) => ACHS.every((a) => !a.secret || S.ach[a.id]);
 /** Permanent bonus of one commendation: the original 32 give +1%, newer ones +0.5%. */
 export const achBonus = (a) => (a.bonus === undefined ? ACH_BONUS : a.bonus);
 export const achBonusTotal = (S) => ACHS.reduce((t, a) => t + (S.ach[a.id] ? achBonus(a) : 0), 0);
@@ -284,6 +286,7 @@ export function statValue(S, stat) {
     case 'upgrades': return upCount(S);
     case 'runs': return S.runs;
     case 'power': return S.power;
+    case 'retro': return S.stats.retro;
     case 'comets': return S.stats.comets;
     case 'ships': return S.stats.ships;
     case 'cometsOnly': return Math.max(0, S.stats.comets - S.stats.ships);
@@ -663,6 +666,9 @@ export function catchComet(S, rand, mult = 1) {
 }
 
 /* ---------- easter eggs ---------- */
+/** Mutates S. Call when 8-bit mode has been switched on by the secret code. */
+export function noteRetro(S) { S.stats.retro++; }
+
 /** About one flyer in thirty-three is a rubber duck instead. `r` is a 0..1 random value. */
 export const DUCK_CHANCE = 0.03;
 export const isDuck = (r) => r < DUCK_CHANCE;

@@ -344,7 +344,7 @@ export function createUI(h) {
     setText($('st-duck'), String(s.stats.ducks || 0));
     setText($('st-comets'), String(s.stats.comets)); setText($('st-missions'), String(s.stats.missions));
     setText($('st-played'), L.fmtDur(s.stats.played)); setText($('st-peak'), L.fmt(s.stats.peak) + ' t/s'); setText($('st-run-best'), String(s.stats.bestRun));
-    setText($('st-best'), s.stats.best + (s.stats.best === 1 ? ' day' : ' days')); setText($('st-ach'), L.achCount(s) + ' of ' + ACHS.length);
+    setText($('st-best'), s.stats.best + (s.stats.best === 1 ? ' day' : ' days')); setText($('st-ach'), L.secretsDone(s) ? L.achCount(s) + ' of ' + ACHS.length : String(L.achCount(s))); // the total stays a secret until every secret one is found
     setText($('st-rank'), L.rankFor(L.achCount(s)).name);
   }
 
@@ -444,7 +444,7 @@ export function createUI(h) {
   function achList(s) {
     const shown = L.CHAINS.filter((c) => !L.chainHidden(s, c));
     if (achView === 'done') return shown.filter((c) => L.chainState(s, c).earnedCount > 0).sort(chainOrder);
-    if (achView === 'type') return L.CHAINS.slice().sort(chainOrder); // includes hidden secrets, drawn as "?" cards
+    if (achView === 'type') return shown.sort(chainOrder); // secret ones stay out of sight until they are earned
     return shown.filter((c) => !L.chainState(s, c).complete)
       .sort((x, y) => ratio(s, L.chainState(s, y).next) - ratio(s, L.chainState(s, x).next)).slice(0, 10);
   }
@@ -462,13 +462,6 @@ export function createUI(h) {
       if (grouped && chain.group !== lastGroup) {
         lastGroup = chain.group;
         const g = document.createElement('h3'); g.className = 'grp'; g.textContent = chain.group; host.appendChild(g);
-      }
-      if (L.chainHidden(s, chain)) {
-        // A secret one nobody has earned yet: a placeholder that gives nothing away.
-        const m = document.createElement('article'); m.className = 'card ach mystery';
-        m.innerHTML = '<div class="count">?</div><div class="info"><h3 class="name"><span class="nm">???</span><span class="tier secret">Secret</span></h3><p class="desc">Keep playing to discover it.</p></div>';
-        host.appendChild(m);
-        return;
       }
       const el = document.createElement('article'); el.className = 'card ach';
       el.innerHTML = '<div class="count"></div><div class="info"><h3 class="name"><span class="nm"></span><span class="tier"></span><span class="tier secret" hidden>Secret</span><span class="newpill" hidden>New</span></h3><p class="chainline"><span class="ctitle"></span><span class="pips"></span></p><p class="desc"></p><div class="track"><div class="fill"></div></div><p class="meta"></p><p class="earned"></p></div><button class="buy can" type="button" hidden><span class="bn">Claim</span><span class="bc"></span></button>';
@@ -498,7 +491,7 @@ export function createUI(h) {
   function updateAch(s) {
     const n = L.achCount(s), rank = L.rankFor(n), nextRank = RANKS.find((r) => r.min > n);
     if (achKey !== achView + '|' + n) buildAch(s);
-    setText($('achcount'), n + ' / ' + ACHS.length);
+    setText($('achcount'), L.secretsDone(s) ? n + ' / ' + ACHS.length : String(n)); // no total until every secret commendation is earned
     const all = L.pendingGifts(s), ab = $('ach-claim');
     ab.hidden = all.count < 2; // one waiting gift is claimed from its own card
     if (all.count >= 2) setText(ab, 'Claim all ' + all.count + ' rewards +' + L.fmt(all.ore));

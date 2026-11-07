@@ -50,9 +50,9 @@ export const TAP_TARGETS = [150, 250, 400];
 /*
  * Commendations. `stat` names a value computed by logic.js (statValue).
  * stat: taps | tapPower | night | allTime | heldOre | rate | fleet | kinds | maxVessel | upgrades | runs | bare | power |
- *       comets | ships | cometsOnly | bestRun | overdrive | missions | chests | best | drops | capped | achs
+ *       comets | ships | cometsOnly | bestRun | overdrive | missions | chests | best | drops | capped | retro | achs
  * group: the category shown in the Goals tab. tier: 1 Bronze, 2 Silver, 3 Gold, 4 and up Platinum.
- * bonus: permanent output and tap bonus; the original 32 give +1%, newer ones +0.5%. secret: hidden until earned.
+ * bonus: permanent output and tap bonus; the original 32 give +1%, newer ones +0.5%. secret: not shown at all until earned.
  */
 export const ACH_BONUS_NEW = 0.005;
 export const ACH_GROUPS = ['Taps', 'Ore', 'Output', 'Fleet', 'Upgrades', 'Belts', 'Survey', 'Flyers', 'Missions', 'Supply', 'Collection'];
@@ -150,6 +150,7 @@ export const ACHS = [
   ach('d2', 'Supply', 2, 'Supply Chain', 'Collect 50 supply drops.', 50, 'drops', NEW),
   ach('d3', 'Supply', 3, 'Loyal Customer', 'Collect 150 supply drops.', 150, 'drops', NEW),
   // Collection
+  ach('rt1', 'Collection', 2, 'Old School', 'Remember how it used to look.', 1, 'retro', { ...NEW, secret: true }),
   ach('a1', 'Collection', 1, 'Collector', 'Earn 10 commendations.', 10, 'achs', NEW),
   ach('a2', 'Collection', 2, 'Curator', 'Earn 25 commendations.', 25, 'achs', NEW),
   ach('a3', 'Collection', 3, 'Archivist', 'Earn 45 commendations.', 45, 'achs', NEW),
@@ -187,12 +188,13 @@ export const CHAIN_IDS = {
   streak: ['s1', 's2', 's3'],
   drops: ['d1', 'd2', 'd3'],
   collection: ['a1', 'a2', 'a3'],
+  retro: ['rt1'],
 };
 export const CHAIN_TITLES = {
   taps: 'Tapping', tapPower: 'Tap power', ore: 'Lifetime ore', hoard: 'Hoard', output: 'Output rate', sleeper: 'Time away',
   fleet: 'Fleet size', kinds: 'Vessel kinds', specialist: 'One kind', upgrades: 'Upgrades', relocations: 'Relocations',
   ringed: 'Rings', spectrum: 'Spectrum', survey: 'Survey bonus', flyers: 'Flyers caught', ships: 'Supply ships',
-  comets: 'Comets', nightowl: 'Night owl', barehands: 'Bare hands', eagleeye: 'Eagle eye', overdrive: 'Overdrive', missions: 'Missions', caches: 'Daily caches', streak: 'Supply streak', drops: 'Supply drops', collection: 'Collection',
+  comets: 'Comets', nightowl: 'Night owl', barehands: 'Bare hands', eagleeye: 'Eagle eye', overdrive: 'Overdrive', missions: 'Missions', caches: 'Daily caches', streak: 'Supply streak', drops: 'Supply drops', collection: 'Collection', retro: 'Retro',
 };
 for (const [chain, ids] of Object.entries(CHAIN_IDS)) {
   for (const id of ids) ACHS.find((a) => a.id === id).chain = chain;
@@ -319,6 +321,7 @@ export const JOURNAL = [
     text: [
       "Eight colours hang in the Drift, and no two belts are alike. Whoever has stood under every one of them is owed a story, and a drink, and probably an apology from the company.",
       "You have started keeping a pocket of dust from each. The jar is getting heavy.",
+      "Someone has scratched a greeting into the dock wall, in a hand older than the company's: two strokes rising, two falling, a sweep left and right and left and right again, then two knocks to show you meant it. The foremen say the rock answers, and that when it does, the Drift remembers how it used to look.",
     ],
   },
   {
