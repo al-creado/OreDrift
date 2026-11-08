@@ -10,3 +10,7 @@ android/local.properties
 android/upload-keystore.jks
 dist
 node_modules
+
+# macOS and Windows folder junk
+.DS_Store
+Thumbs.db

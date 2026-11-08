@@ -10,15 +10,15 @@ const D = (y, m, d) => new Date(y, m - 1, d, 12);
 const state = (patch = {}) => Object.assign(L.fresh(NOW), patch);
 
 describe('data', () => {
-  it('has 7 vessels, 15 upgrades and 71 commendations with unique ids', () => {
+  it('has 7 vessels, 15 upgrades and 72 commendations with unique ids', () => {
     expect(GENS).toHaveLength(7);
     expect(UPS).toHaveLength(15);
     expect(new Set(UPS.map((x) => x.id)).size).toBe(15);
     const tiers = ['u1', 'u2', 'u3', 'u4'].map((id) => ACHS.find((a) => a.id === id));
     expect(tiers.map((a) => a.t)).toEqual([3, 6, 10, UPS.length]);   // spread across the list; the last always asks for every upgrade
     expect(tiers[3].desc).toContain(String(UPS.length));
-    expect(ACHS).toHaveLength(71);
-    expect(new Set(ACHS.map((a) => a.id)).size).toBe(71);
+    expect(ACHS).toHaveLength(72);
+    expect(new Set(ACHS.map((a) => a.id)).size).toBe(72);
   });
 });
 
@@ -169,7 +169,7 @@ describe('output and tap formulas', () => {
   });
 
   it('survey points add 10% each and commendations 1% each', () => {
-    const S = state({ owned: { laser: 10 }, points: 3 });
+    const S = state({ owned: { laser: 10 }, power: 3 });
     S.ach = { t1: true, t2: true, o1: true, f1: true, c1: true };
     expect(L.surveyMult(S)).toBeCloseTo(1.3, 9);
     expect(L.achMult(S)).toBeCloseTo(1.05, 9);
@@ -190,7 +190,7 @@ describe('output and tap formulas', () => {
   });
 
   it('with every upgrade, survey points and commendations', () => {
-    const S = state({ points: 2, ups: Object.fromEntries(UPS.slice(0, 9).map((x) => [x.id, true])), owned: { drone: 10 } }); // the original nine
+    const S = state({ power: 2, ups: Object.fromEntries(UPS.slice(0, 9).map((x) => [x.id, true])), owned: { drone: 10 } }); // the original nine
     S.ach = { t1: true, t2: true };
     const o = L.ops(S);
     // output: 10*0.1*2 = 2, tunes 1.25*1.5*2 = 3.75, survey 1.2, ach 1.02
@@ -234,26 +234,26 @@ describe('survey points and relocate', () => {
     expect(L.nextPointAt(state({ total: 0 }))).toBe(1e6);
   });
   it('points get dearer the more you hold, so relocating cannot be spammed', () => {
-    expect(L.pointCost(state({ points: 0 }))).toBe(1e6);
-    expect(L.pointCost(state({ points: 10 }))).toBeCloseTo(8e6, 3);        // (1 + 10/10)^3
-    expect(L.pointCost(state({ points: 99 }))).toBeCloseTo(1e6 * 10.9 ** 3, 0);
-    // with 10 points a run that mined 1M earns nothing now; it needs 8M for the first point
-    expect(L.prestigeGain(state({ points: 10, total: 1e6 }))).toBe(0);
-    expect(L.prestigeGain(state({ points: 10, total: 8e6 }))).toBe(1);
-    expect(L.prestigeGain(state({ points: 10, total: 32e6 }))).toBe(2);
-    expect(L.nextPointAt(state({ points: 10, total: 8e6 }))).toBe(32e6);
-    const pv = L.relocatePreview(state({ points: 10, total: 8e6 }));
+    expect(L.pointCost(state({ power: 0 }))).toBe(1e6);
+    expect(L.pointCost(state({ power: 10 }))).toBeCloseTo(8e6, 3);        // (1 + 10/10)^3
+    expect(L.pointCost(state({ power: 99 }))).toBeCloseTo(1e6 * 10.9 ** 3, 0);
+    // with 10 bonus steps a run that mined 1M earns nothing now; it needs 8M for the first step
+    expect(L.prestigeGain(state({ power: 10, total: 1e6 }))).toBe(0);
+    expect(L.prestigeGain(state({ power: 10, total: 8e6 }))).toBe(1);
+    expect(L.prestigeGain(state({ power: 10, total: 32e6 }))).toBe(2);
+    expect(L.nextPointAt(state({ power: 10, total: 8e6 }))).toBe(32e6);
+    const pv = L.relocatePreview(state({ power: 10, total: 8e6 }));
     expect(pv.gain).toBe(1); expect(pv.nextAt).toBe(32e6); expect(pv.progress).toBe(0);
   });
 
   it('previews what relocating would do without changing anything', () => {
     const cost = 1e6 * 1.2 ** 3; // 2 points held -> each new point costs 1.728M
-    const S = state({ points: 2, total: 8e6, ore: 1234, owned: { drone: 3, laser: 4 }, ups: { bits: true, tune1: true } });
+    const S = state({ points: 2, power: 2, total: 8e6, ore: 1234, owned: { drone: 3, laser: 4 }, ups: { bits: true, tune1: true } });
     const before = JSON.stringify(S);
     const p = L.relocatePreview(S);
     expect(JSON.stringify(S)).toBe(before);
     expect(p.gain).toBe(2);
-    expect(p).toMatchObject({ pointsBefore: 2, pointsAfter: 4 });
+    expect(p).toMatchObject({ pointsBefore: 2, pointsAfter: 3 }); // one survey point, though the bonus grows by two steps
     expect(p.nextAt).toBeCloseTo(9 * cost, 3);
     expect(p.surveyBefore).toBeCloseTo(0.2, 9);
     expect(p.surveyAfter).toBeCloseTo(0.4, 9);
@@ -265,13 +265,25 @@ describe('survey points and relocate', () => {
   });
 
   it('the preview matches what relocating really gives', () => {
-    const S = state({ points: 3, total: 9e6, owned: { laser: 10 }, ach: { t1: true }, iap: { removeAds: false, starter: false, boost: true } });
+    const S = state({ points: 3, power: 3, total: 9e6, owned: { laser: 10 }, ach: { t1: true }, iap: { removeAds: false, starter: false, boost: true } });
     const p = L.relocatePreview(S), opsBefore = L.ops(S);
     L.relocate(S);
     S.owned = { laser: 10 };
     expect(S.points).toBe(p.pointsAfter);
     expect(L.achMult(S) * L.iapMult(S) * L.surveyMult(S) - 1).toBeCloseTo(p.bonusAfter, 9);
     expect(L.ops(S) / opsBefore).toBeCloseTo(p.ratio, 9);
+  });
+
+  it('always gives exactly 1 survey point, however big the run; the bonus is what grows', () => {
+    const small = state({ total: 1e6 }), huge = state({ total: 1e12 });
+    const gs = L.relocate(small), gh = L.relocate(huge);
+    expect(gs).toBe(1); expect(gh).toBe(1000);            // bonus steps: floor(sqrt(total / 1M))
+    expect(small.points).toBe(1); expect(huge.points).toBe(1);
+    expect(small.power).toBe(1); expect(huge.power).toBe(1000);
+    expect(L.surveyMult(huge)).toBeCloseTo(1 + 0.1 * 1000, 9);
+    const pv = L.relocatePreview(state({ total: 1e12 }));
+    expect(pv.pointsAfter - pv.pointsBefore).toBe(1);
+    expect(L.relocatePreview(state({ total: 1e5 })).pointsAfter).toBe(0); // nothing to relocate yet: no point
   });
 
   it('preview with no points yet shows progress toward the first one', () => {
@@ -284,7 +296,7 @@ describe('survey points and relocate', () => {
   });
 
   it('includes commendations and the shop boost in the total bonus', () => {
-    const S = state({ points: 1, total: 2e6, ach: { t1: true, sh1: true }, iap: { removeAds: false, starter: false, boost: true } });
+    const S = state({ points: 1, power: 1, total: 2e6, ach: { t1: true, sh1: true }, iap: { removeAds: false, starter: false, boost: true } });
     const p = L.relocatePreview(S);
     const other = 1.015 * 1.25;
     expect(p.bonusBefore).toBeCloseTo(1.1 * other - 1, 9);
@@ -300,7 +312,7 @@ describe('survey points and relocate', () => {
 
   it('resets the run and keeps permanent progress', () => {
     const S = state({
-      ore: 1e6, total: 16e6, allTime: 5e7, taps: 123, points: 2, runs: 1,
+      ore: 1e6, total: 16e6, allTime: 5e7, taps: 123, points: 2, power: 2, runs: 1,
       owned: { drone: 40 }, ups: { bits: true }, sound: false, streak: 4, lastSupply: '2026-01-02',
       frenzyUntil: NOW + 1000,
     });
@@ -308,7 +320,7 @@ describe('survey points and relocate', () => {
     S.stats = { comets: 5, missions: 6, best: 7 };
     S.daily = { day: '2026-01-02', chest: true, missions: [] };
     expect(L.relocate(S)).toBe(3);
-    expect(S).toMatchObject({ ore: 0, total: 0, owned: {}, ups: {}, points: 5, runs: 2 });
+    expect(S).toMatchObject({ ore: 0, total: 0, owned: {}, ups: {}, points: 3, power: 5, runs: 2 }); // +1 survey point, +3 bonus steps
     expect(S).toMatchObject({ allTime: 5e7, taps: 123, sound: false, streak: 4, lastSupply: '2026-01-02' });
     expect(S.ach).toEqual({ t1: true });
     expect(S.stats).toEqual({ comets: 5, missions: 6, best: 7 });
@@ -721,7 +733,7 @@ describe('commendations', () => {
       case 'allTime': S.allTime = v; break;
       case 'heldOre': S.ore = v; break;
       case 'runs': S.runs = v; break;
-      case 'points': S.points = v; break;
+      case 'power': S.power = v; break;
       case 'comets': S.stats.comets = v; break;
       case 'ships': S.stats.ships = v; S.stats.comets = v; break;
       case 'cometsOnly': S.stats.comets = v; S.stats.ships = 0; break;
@@ -734,6 +746,7 @@ describe('commendations', () => {
       case 'bare': S.stats.bare = v; break;
       case 'bestRun': S.stats.bestRun = v; break;
       case 'overdrive': S.stats.overdrive = v; break;
+      case 'retro': S.stats.retro = v; break;
       case 'fleet': case 'maxVessel': S.owned = { drone: v }; break;
       case 'kinds': S.owned = Object.fromEntries(GENS.slice(0, v).map((x) => [x.id, 1])); break;
       case 'upgrades': S.ups = Object.fromEntries(UPS.slice(0, v).map((x) => [x.id, true])); break;
@@ -749,7 +762,7 @@ describe('commendations', () => {
       expect(L.achBonus(a)).toBe(0.01);
       expect(a.secret).toBeUndefined();
     }
-    expect(NEW_IDS).toHaveLength(39);
+    expect(NEW_IDS).toHaveLength(40);
   });
 
   it('every commendation has a known group and a tier, and the new ones give +0.5%', () => {
@@ -764,12 +777,12 @@ describe('commendations', () => {
   });
 
   describe('chains (one tile for Bronze, Silver, Gold...)', () => {
-    it('puts every commendation in exactly one chain, giving 26 tiles', () => {
+    it('puts every commendation in exactly one chain, giving 27 tiles', () => {
       const ids = L.CHAINS.flatMap((c) => c.steps.map((a) => a.id));
-      expect(ids).toHaveLength(71);
-      expect(new Set(ids).size).toBe(71);
-      expect(L.CHAINS).toHaveLength(26);
-      expect(new Set(L.CHAINS.map((c) => c.id)).size).toBe(26);
+      expect(ids).toHaveLength(72);
+      expect(new Set(ids).size).toBe(72);
+      expect(L.CHAINS).toHaveLength(27);
+      expect(new Set(L.CHAINS.map((c) => c.id)).size).toBe(27);
       for (const a of ACHS) expect(a.chain, a.id).toBeTruthy();
     });
 
@@ -787,10 +800,10 @@ describe('commendations', () => {
       }
     });
 
-    it('the long goals are chains and the eight secrets are single tiles', () => {
+    it('the long goals are chains and the nine secrets are single tiles', () => {
       const len = (id) => L.CHAINS.find((c) => c.id === id).steps.length;
       expect([len('taps'), len('ore'), len('fleet'), len('survey'), len('relocations')]).toEqual([4, 5, 5, 4, 4]);
-      expect(L.CHAINS.filter((c) => c.secret).map((c) => c.id).sort()).toEqual(['barehands', 'eagleeye', 'hoard', 'nightowl', 'overdrive', 'ringed', 'sleeper', 'spectrum']);
+      expect(L.CHAINS.filter((c) => c.secret).map((c) => c.id).sort()).toEqual(['barehands', 'eagleeye', 'hoard', 'nightowl', 'overdrive', 'retro', 'ringed', 'sleeper', 'spectrum']);
       expect(L.CHAINS.filter((c) => c.secret).every((c) => c.steps.length === 1)).toBe(true);
     });
 
@@ -820,8 +833,8 @@ describe('commendations', () => {
     });
   });
 
-  it('has eight secret commendations', () => {
-    expect(ACHS.filter((a) => a.secret).map((a) => a.id).sort()).toEqual(['br1', 'er1', 'h1', 'n1', 'ov1', 'rb1', 'rb2', 'z1']);
+  it('has nine secret commendations', () => {
+    expect(ACHS.filter((a) => a.secret).map((a) => a.id).sort()).toEqual(['br1', 'er1', 'h1', 'n1', 'ov1', 'rb1', 'rb2', 'rt1', 'z1']);
   });
 
   for (const a of ACHS.filter((x) => x.stat !== 'rate' && x.stat !== 'tapPower' && x.stat !== 'achs')) {
@@ -861,7 +874,7 @@ describe('commendations', () => {
     it('Heavy Hand needs a tap worth 100 t', () => {
       const S = state({ ups: { bits: true, plasma: true, hammer: true, pulse: true } });
       expect(L.checkAch(S).map((x) => x.id)).not.toContain('tp1'); // 60 t
-      S.points = 7; // 60 x 1.7 = 102
+      S.power = 7; // 60 x 1.7 = 102
       expect(L.checkAch(S).map((x) => x.id)).toContain('tp1');
     });
     it('uplinks count, so a huge fleet makes huge taps', () => {
@@ -922,10 +935,10 @@ describe('commendations', () => {
       expect(L.achBonusTotal(S)).toBeCloseTo(0.02, 12);
       expect(L.ops(S)).toBeCloseTo(20 * 1.02, 9);
     });
-    it('earning all 71 adds 32% + 19.5%', () => {
+    it('earning all 72 adds 32% + 20%', () => {
       const S = state();
       S.ach = Object.fromEntries(ACHS.map((a) => [a.id, true]));
-      expect(L.achBonusTotal(S)).toBeCloseTo(0.32 + 0.195, 9);
+      expect(L.achBonusTotal(S)).toBeCloseTo(0.32 + 0.2, 9);
     });
   });
 
@@ -1629,6 +1642,33 @@ describe('save-shape defaults', () => {
     });
   });
 
+  describe('secret commendations are hidden', () => {
+    it('Old School comes from switching on 8-bit mode', () => {
+      const S = state();
+      expect(L.checkAch(S).map((a) => a.id)).not.toContain('rt1');
+      L.noteRetro(S);
+      expect(S.stats.retro).toBe(1);
+      expect(L.checkAch(S).map((a) => a.id)).toContain('rt1');
+      expect(L.chainHidden(S, L.CHAINS.find((c) => c.id === 'retro'))).toBe(false);
+    });
+    it('the total number of commendations stays hidden until every secret one is earned', () => {
+      const S = state();
+      expect(L.secretsDone(S)).toBe(false);
+      for (const a of ACHS.filter((x) => x.secret)) S.ach[a.id] = true;
+      expect(L.secretsDone(S)).toBe(true);
+      S.ach.rt1 = false;
+      expect(L.secretsDone(S)).toBe(false);   // one missing is enough
+    });
+    it('a secret one stays out of sight until earned, but still counts once earned', () => {
+      const S = state();
+      const hidden = L.CHAINS.filter((c) => L.chainHidden(S, c));
+      expect(hidden).toHaveLength(9);
+      S.ach.n1 = true;
+      expect(L.CHAINS.filter((c) => L.chainHidden(S, c))).toHaveLength(8);
+      expect(L.achCount(S)).toBe(1);
+    });
+  });
+
   describe('cosmetic skins', () => {
     const rock = () => SKINS.find((k) => k.slot === 'rock' && k.cost === 2), pricey = () => SKINS.find((k) => k.cost >= 10);
     it('buying spends spare points, wears the skin, and cannot go below zero', () => {
@@ -1643,7 +1683,7 @@ describe('save-shape defaults', () => {
       expect(L.buySkin(S, 'nope')).toBe(false);
     });
     it('is purely cosmetic: spending points never changes output or the survey bonus', () => {
-      const S = state({ points: 12, owned: { laser: 10 } });
+      const S = state({ points: 12, power: 12, owned: { laser: 10 } });
       const before = { ops: L.ops(S), tap: L.tapValue(S, 0, L.ops(S)), mult: L.surveyMult(S), prev: L.relocatePreview(S).bonusBefore };
       L.buySkin(S, rock().id); L.buySkin(S, pricey().id);
       expect(S.spent).toBeGreaterThan(0);
@@ -1663,19 +1703,18 @@ describe('save-shape defaults', () => {
       expect(f).toBeTruthy();
     });
     it('survives relocating, and new points can be spent', () => {
-      const S = state({ points: 2, total: 5e6 });
+      const S = state({ points: 2, power: 2, total: 5e6 });
       L.buySkin(S, rock().id);
-      const gained = L.relocate(S);
-      expect(gained).toBeGreaterThan(0);
+      expect(L.relocate(S)).toBeGreaterThan(0);
       expect(S.skins[rock().id]).toBe(true); expect(S.spent).toBe(2);
-      expect(L.spendablePoints(S)).toBe(gained);
+      expect(L.spendablePoints(S)).toBe(1); // 3 points earned, 2 spent
     });
   });
 
   it('fresh state has the documented fields', () => {
     const S = L.fresh(42);
     expect(Object.keys(S).sort()).toEqual(['ach', 'allTime', 'daily', 'frenzyUntil', 'gifts', 'haptics', 'last', 'lastSupply', 'owned',
-      'granted', 'iap', 'journalSeen', 'music', 'notify', 'podReadyAt', 'points', 'ore', 'runs', 'skins', 'look', 'spent', 'tutorial', 'sound', 'stats', 'streak', 'taps', 'total', 'ups', 'weekly'].sort());
+      'granted', 'iap', 'journalSeen', 'music', 'notify', 'podReadyAt', 'points', 'power', 'ore', 'runs', 'skins', 'look', 'spent', 'tutorial', 'sound', 'stats', 'streak', 'taps', 'total', 'ups', 'weekly'].sort());
     expect(S.last).toBe(42);
     expect(S.sound).toBe(true);
   });

@@ -5,8 +5,8 @@ export const MILESTONES = [10, 25, 50, 100, 150, 200];
 export const OFFLINE_CAP = 8 * 3600;
 export const OFFLINE_RATE = 0.5;
 export const PRESTIGE_BASE = 1e6;
-/* Each survey point you hold makes the next ones dearer, so a stronger fleet cannot spam relocations:
-   one point costs PRESTIGE_BASE * (1 + points / PRESTIGE_GROWTH_DIV) ^ PRESTIGE_GROWTH_POW ore in a run. */
+/* Each survey bonus step you hold makes the next ones dearer, so a stronger fleet cannot spam relocations:
+   one bonus step costs PRESTIGE_BASE * (1 + steps / PRESTIGE_GROWTH_DIV) ^ PRESTIGE_GROWTH_POW ore in a run. */
 export const PRESTIGE_GROWTH_DIV = 10;
 export const PRESTIGE_GROWTH_POW = 3;
 export const FRENZY_MULT = 7;
@@ -49,10 +49,10 @@ export const TAP_TARGETS = [150, 250, 400];
 
 /*
  * Commendations. `stat` names a value computed by logic.js (statValue).
- * stat: taps | tapPower | night | allTime | heldOre | rate | fleet | kinds | maxVessel | upgrades | runs | bare | points |
- *       comets | ships | cometsOnly | bestRun | overdrive | missions | chests | best | drops | capped | achs
+ * stat: taps | tapPower | night | allTime | heldOre | rate | fleet | kinds | maxVessel | upgrades | runs | bare | power |
+ *       comets | ships | cometsOnly | bestRun | overdrive | missions | chests | best | drops | capped | retro | achs
  * group: the category shown in the Goals tab. tier: 1 Bronze, 2 Silver, 3 Gold, 4 and up Platinum.
- * bonus: permanent output and tap bonus; the original 32 give +1%, newer ones +0.5%. secret: hidden until earned.
+ * bonus: permanent output and tap bonus; the original 32 give +1%, newer ones +0.5%. secret: not shown at all until earned.
  */
 export const ACH_BONUS_NEW = 0.005;
 export const ACH_GROUPS = ['Taps', 'Ore', 'Output', 'Fleet', 'Upgrades', 'Belts', 'Survey', 'Flyers', 'Missions', 'Supply', 'Collection'];
@@ -118,11 +118,11 @@ export const ACHS = [
   ach('rb1', 'Belts', 2, 'Ringed World', 'Reach a belt with a ring.', 2, 'runs', { ...NEW, secret: true }),
   ach('rb2', 'Belts', 3, 'Full Spectrum', 'Visit all 8 kinds of belt.', 7, 'runs', { ...NEW, secret: true }),
   ach('br1', 'Belts', 2, 'Bare Hands', 'Relocate without installing a single upgrade.', 1, 'bare', { ...NEW, secret: true }),
-  // Survey points
-  ach('sv1', 'Survey', 1, 'Surveyor', 'Hold 10 survey points.', 10, 'points', NEW),
-  ach('sv2', 'Survey', 2, 'Cartographer', 'Hold 50 survey points.', 50, 'points', NEW),
-  ach('sv3', 'Survey', 3, 'Cosmographer', 'Hold 200 survey points.', 200, 'points', NEW),
-  ach('sv4', 'Survey', 4, 'Belt Whisperer', 'Hold 1,000 survey points.', 1000, 'points', NEW),
+  // Survey bonus
+  ach('sv1', 'Survey', 1, 'Surveyor', 'Reach a +100% survey bonus.', 10, 'power', NEW),
+  ach('sv2', 'Survey', 2, 'Cartographer', 'Reach a +500% survey bonus.', 50, 'power', NEW),
+  ach('sv3', 'Survey', 3, 'Cosmographer', 'Reach a +2,000% survey bonus.', 200, 'power', NEW),
+  ach('sv4', 'Survey', 4, 'Belt Whisperer', 'Reach a +10,000% survey bonus.', 1000, 'power', NEW),
   // Flyers
   ach('c1', 'Flyers', 1, 'Sky Watcher', 'Catch a comet or supply ship.', 1, 'comets'),
   ach('c2', 'Flyers', 2, 'Comet Hunter', 'Catch 25 comets or supply ships.', 25, 'comets'),
@@ -150,6 +150,7 @@ export const ACHS = [
   ach('d2', 'Supply', 2, 'Supply Chain', 'Collect 50 supply drops.', 50, 'drops', NEW),
   ach('d3', 'Supply', 3, 'Loyal Customer', 'Collect 150 supply drops.', 150, 'drops', NEW),
   // Collection
+  ach('rt1', 'Collection', 2, 'Old School', 'Remember how it used to look.', 1, 'retro', { ...NEW, secret: true }),
   ach('a1', 'Collection', 1, 'Collector', 'Earn 10 commendations.', 10, 'achs', NEW),
   ach('a2', 'Collection', 2, 'Curator', 'Earn 25 commendations.', 25, 'achs', NEW),
   ach('a3', 'Collection', 3, 'Archivist', 'Earn 45 commendations.', 45, 'achs', NEW),
@@ -187,12 +188,13 @@ export const CHAIN_IDS = {
   streak: ['s1', 's2', 's3'],
   drops: ['d1', 'd2', 'd3'],
   collection: ['a1', 'a2', 'a3'],
+  retro: ['rt1'],
 };
 export const CHAIN_TITLES = {
   taps: 'Tapping', tapPower: 'Tap power', ore: 'Lifetime ore', hoard: 'Hoard', output: 'Output rate', sleeper: 'Time away',
   fleet: 'Fleet size', kinds: 'Vessel kinds', specialist: 'One kind', upgrades: 'Upgrades', relocations: 'Relocations',
-  ringed: 'Rings', spectrum: 'Spectrum', survey: 'Survey points', flyers: 'Flyers caught', ships: 'Supply ships',
-  comets: 'Comets', nightowl: 'Night owl', barehands: 'Bare hands', eagleeye: 'Eagle eye', overdrive: 'Overdrive', missions: 'Missions', caches: 'Daily caches', streak: 'Supply streak', drops: 'Supply drops', collection: 'Collection',
+  ringed: 'Rings', spectrum: 'Spectrum', survey: 'Survey bonus', flyers: 'Flyers caught', ships: 'Supply ships',
+  comets: 'Comets', nightowl: 'Night owl', barehands: 'Bare hands', eagleeye: 'Eagle eye', overdrive: 'Overdrive', missions: 'Missions', caches: 'Daily caches', streak: 'Supply streak', drops: 'Supply drops', collection: 'Collection', retro: 'Retro',
 };
 for (const [chain, ids] of Object.entries(CHAIN_IDS)) {
   for (const id of ids) ACHS.find((a) => a.id === id).chain = chain;
@@ -217,7 +219,7 @@ export const GRANTED_KEEP = 50;
 
 /*
  * Cosmetic skins, bought with spare survey points. They change how the game looks and nothing else: the survey
- * bonus keeps counting every point ever earned, and spending only moves points from "to spend" to "spent".
+ * bonus (a separate number, S.power) is untouched, and spending only moves points from "to spend" to "spent".
  * slot: where it applies. rock skins either borrow a belt's colour scheme (belt: index into BELTS) or bring their own.
  * An empty look id ('') is the default for that slot.
  */
@@ -276,7 +278,7 @@ export const JOURNAL = [
     id: 'j3', title: 'A Light in the Sky', stat: 'comets', t: 1, req: 'Catch a comet or a supply ship.',
     text: [
       "Something bright crossed the sky today. First a comet, shedding rock like a dropped sack of coins, then a supply ship with its lamps blazing, hauling crates for anyone quick enough to wave it down.",
-      "Catch what passes. The Drift rewards the miner who keeps looking up. They tell of a pilot who snagged five lights in a row and never let a single one slip by him. Nobody has ever proved it.",
+      "Catch what passes. The Drift rewards the miner who keeps looking up. They tell of a pilot who never let a single light slip by him, not one, through a long and lucky watch. Nobody has ever proved it.",
     ],
   },
   {
@@ -303,22 +305,23 @@ export const JOURNAL = [
   {
     id: 'j7', title: 'What the Dock Remembers', stat: 'allTime', t: 1e8, req: 'Mine 100 million t in total.',
     text: [
-      "On quiet nights you read the old logs aloud. The fleet works while you sleep; it always has. Leave it alone long enough that it nods off on the job, eight hours and a breath, and the hold is not so much full as astonished.",
-      "One foreman swore the lamps of a supply ship once burned two whole minutes without dimming, crate stacked on crate, as if the sky itself owed him a favour.",
+      "On quiet nights you read the old logs aloud. The fleet works while you sleep; it always has. Leave it alone long enough that it nods off on the job, and the hold is not so much full as astonished.",
+      "One foreman swore the lamps of a supply ship once burned far longer than lamps should, crate stacked on crate, as if the sky itself owed him a favour.",
     ],
   },
   {
     id: 'j8', title: 'The Hoard', stat: 'allTime', t: 1e9, req: 'Mine 1 billion t in total.',
     text: [
-      "Every belt has its legend, and this one has a dragon. They say it sleeps on a billion tonnes and has never spent a gram, and that it counts the pile every night by the light of its own scales.",
+      "Every belt has its legend, and this one has a dragon. They say it sleeps on a pile no one has dared to count and has never spent a gram, and that it counts it every night by the light of its own scales.",
       "You are not a dragon. You spend. But on the quiet nights you wonder what that much ore would look like in one place.",
     ],
   },
   {
     id: 'j9', title: 'The Colours of the Drift', stat: 'runs', t: 5, req: 'Relocate 5 times.',
     text: [
-      "Eight colours hang in the Drift, and no two belts are alike. Whoever has stood under every one of them is owed a story, and a drink, and probably an apology from the company.",
+      "The Drift hangs in more colours than the charts admit, and no two belts are alike. Whoever has stood under every one of them is owed a story, and a drink, and probably an apology from the company.",
       "You have started keeping a pocket of dust from each. The jar is getting heavy.",
+      "Someone has scratched a greeting into the dock wall, in a hand older than the company's: two strokes rising, two falling, a sweep left and right and left and right again, then two knocks to show you meant it. The foremen say the rock answers, and that when it does, the Drift remembers how it used to look.",
     ],
   },
   {

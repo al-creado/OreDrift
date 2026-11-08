@@ -7,7 +7,7 @@ import '@fontsource/ibm-plex-mono/500.css';
 import '@fontsource/ibm-plex-mono/600.css';
 import './style.css';
 
-import { FRENZY_MULT } from './data.js';
+import { FRENZY_MULT, SURVEY_BONUS } from './data.js';
 import * as L from './logic.js';
 import { createScene } from './scene.js';
 import { createUI } from './ui.js';
@@ -197,7 +197,7 @@ function onBuyUp(u) {
 function onRelocate() {
   const g = L.relocate(S);
   if (!g) return;
-  ui.toast('New belt surveyed: ' + beltFor(S.runs).name + '. +' + g + ' survey point' + (g > 1 ? 's' : '') + '.', 4500);
+  ui.toast('New belt surveyed: ' + beltFor(S.runs).name + '. +1 survey point and +' + L.fmtPct(g * SURVEY_BONUS, 0) + ' bonus.', 4500);
   sounds.relocate();
   refresh(); save();
 }
@@ -229,6 +229,7 @@ function setRetroMode(on) {
 }
 function startRetro() {
   const now = Date.now(), was = retroUntil > now;
+  L.noteRetro(S); // the "Old School" commendation
   retroUntil = now + RETRO_MS;
   if (!was) setRetroMode(true);
   ui.toast('8-BIT MODE! Sixty seconds of pixels.', 3500);

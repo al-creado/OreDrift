@@ -312,7 +312,7 @@ export function createUI(h) {
   function updateSkins(s) {
     const spare = L.spendablePoints(s);
     setText($('skin-pts'), String(spare));
-    setText($('skin-note'), 'Skins are bought with survey points and only change how the game looks. Spending survey points on them never lowers your bonus, and every point still counts for output.');
+    setText($('skin-note'), 'Skins are bought with survey points, 1 for every relocation. They only change how the game looks, and spending points never lowers your bonus.');
     skinEls.forEach((c) => {
       const k = c.skin, worn = k.id ? L.wornSkin(s, k.slot) === k : !L.wornSkin(s, k.slot);
       const owned = !k.id || L.owns_skin(s, k.id);
@@ -344,13 +344,13 @@ export function createUI(h) {
     setText($('st-duck'), String(s.stats.ducks || 0));
     setText($('st-comets'), String(s.stats.comets)); setText($('st-missions'), String(s.stats.missions));
     setText($('st-played'), L.fmtDur(s.stats.played)); setText($('st-peak'), L.fmt(s.stats.peak) + ' t/s'); setText($('st-run-best'), String(s.stats.bestRun));
-    setText($('st-best'), s.stats.best + (s.stats.best === 1 ? ' day' : ' days')); setText($('st-ach'), L.achCount(s) + ' of ' + ACHS.length);
+    setText($('st-best'), s.stats.best + (s.stats.best === 1 ? ' day' : ' days')); setText($('st-ach'), L.secretsDone(s) ? L.achCount(s) + ' of ' + ACHS.length : String(L.achCount(s))); // the total stays a secret until every secret one is found
     setText($('st-rank'), L.rankFor(L.achCount(s)).name);
   }
 
   function updateBelt(s) {
     if (activeTab !== 'belt') return;
-    $('bs-relocate').hidden = L.prestigeGain(s) < 1;           // a survey point is waiting
+    $('bs-relocate').hidden = L.prestigeGain(s) < 1;           // a relocation is ready
     const pv = L.relocatePreview(s), g = pv.gain;
     setText($('pts'), String(s.points));
     updateSkins(s);
@@ -359,10 +359,10 @@ export function createUI(h) {
 
     // What relocating gives (and costs), spelled out.
     setText($('rl-gain'), g >= 1
-      ? '+' + g + ' survey point' + (g > 1 ? 's' : '') + ': everything you earn ×' + pv.ratio.toFixed(2)
+      ? '+1 survey point, and everything you earn ×' + pv.ratio.toFixed(2)
       : 'Not yet: ' + L.fmt(Math.max(0, pv.nextAt - s.total)) + ' t to go');
     setFill($('rl-fill'), pv.progress * 100);
-    setText($('relnote'), (g >= 1 ? 'The next survey point' : 'Your first survey point') + ' comes at ' + L.fmt(pv.nextAt) + ' t this run (' + L.fmt(s.total) + ' so far). The bar shows the way there.');
+    setText($('relnote'), (g >= 1 ? 'More bonus' : 'Your first bonus') + ' comes at ' + L.fmt(pv.nextAt) + ' t this run (' + L.fmt(s.total) + ' so far). The bar shows the way there.');
     $('rl-detail').hidden = g < 1;
     setText($('rl-pts'), pv.pointsBefore + ' → ' + pv.pointsAfter);
     setText($('rl-sb'), '+' + pct(pv.surveyBefore) + ' → +' + pct(pv.surveyAfter));
@@ -444,7 +444,7 @@ export function createUI(h) {
   function achList(s) {
     const shown = L.CHAINS.filter((c) => !L.chainHidden(s, c));
     if (achView === 'done') return shown.filter((c) => L.chainState(s, c).earnedCount > 0).sort(chainOrder);
-    if (achView === 'type') return L.CHAINS.slice().sort(chainOrder); // includes hidden secrets, drawn as "?" cards
+    if (achView === 'type') return shown.sort(chainOrder); // secret ones stay out of sight until they are earned
     return shown.filter((c) => !L.chainState(s, c).complete)
       .sort((x, y) => ratio(s, L.chainState(s, y).next) - ratio(s, L.chainState(s, x).next)).slice(0, 10);
   }
@@ -462,13 +462,6 @@ export function createUI(h) {
       if (grouped && chain.group !== lastGroup) {
         lastGroup = chain.group;
         const g = document.createElement('h3'); g.className = 'grp'; g.textContent = chain.group; host.appendChild(g);
-      }
-      if (L.chainHidden(s, chain)) {
-        // A secret one nobody has earned yet: a placeholder that gives nothing away.
-        const m = document.createElement('article'); m.className = 'card ach mystery';
-        m.innerHTML = '<div class="count">?</div><div class="info"><h3 class="name"><span class="nm">???</span><span class="tier secret">Secret</span></h3><p class="desc">Keep playing to discover it.</p></div>';
-        host.appendChild(m);
-        return;
       }
       const el = document.createElement('article'); el.className = 'card ach';
       el.innerHTML = '<div class="count"></div><div class="info"><h3 class="name"><span class="nm"></span><span class="tier"></span><span class="tier secret" hidden>Secret</span><span class="newpill" hidden>New</span></h3><p class="chainline"><span class="ctitle"></span><span class="pips"></span></p><p class="desc"></p><div class="track"><div class="fill"></div></div><p class="meta"></p><p class="earned"></p></div><button class="buy can" type="button" hidden><span class="bn">Claim</span><span class="bc"></span></button>';
@@ -498,7 +491,7 @@ export function createUI(h) {
   function updateAch(s) {
     const n = L.achCount(s), rank = L.rankFor(n), nextRank = RANKS.find((r) => r.min > n);
     if (achKey !== achView + '|' + n) buildAch(s);
-    setText($('achcount'), n + ' / ' + ACHS.length);
+    setText($('achcount'), L.secretsDone(s) ? n + ' / ' + ACHS.length : String(n)); // no total until every secret commendation is earned
     const all = L.pendingGifts(s), ab = $('ach-claim');
     ab.hidden = all.count < 2; // one waiting gift is claimed from its own card
     if (all.count >= 2) setText(ab, 'Claim all ' + all.count + ' rewards +' + L.fmt(all.ore));
@@ -602,8 +595,21 @@ export function createUI(h) {
     updateAch(s);
     if (goalsFocus) { const f = goalsFocus; goalsFocus = null; spotlightReward(s, f); }
   }
-  /** Scrolls to a commendation card and flashes it: the given chain's, or else the first with a reward waiting. */
+  /**
+   * Scrolls to a commendation reward and flashes it. A commendation that was asked for (f.chain, from its banner) is shown first.
+   * Otherwise, when several rewards are waiting, the "Claim all" button is the place to start; with just one, its card.
+   */
   function spotlightReward(s, f) {
+    const smooth = matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
+    if (!f.chain && L.pendingGifts(s).count >= 2) {
+      const all = $('ach-claim');
+      if (!all.hidden) {
+        all.scrollIntoView({ block: 'center', behavior: smooth });
+        all.classList.add('spot');
+        setTimeout(() => all.classList.remove('spot'), 1800);
+        return;
+      }
+    }
     const find = () => (f.chain ? achEls.find((e) => e.chain.id === f.chain) : achEls.find((e) => !e.btn.hidden));
     let e = find();
     if (!e && (f.chain || L.pendingGifts(s).count > 0)) { // the current view leaves it out: show every chain
@@ -613,7 +619,7 @@ export function createUI(h) {
       e = find();
     }
     if (!e) return; // nothing waiting: stay at the top, where the daily rewards are
-    e.root.scrollIntoView({ block: 'center', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+    e.root.scrollIntoView({ block: 'center', behavior: smooth });
     e.root.classList.add('spot');
     setTimeout(() => e.root.classList.remove('spot'), 1800);
   }
