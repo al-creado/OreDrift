@@ -168,6 +168,8 @@ canvas { display: block; width: 100%; height: 100%; touch-action: none; outline-
 .card.ach.claim { grid-template-columns: 52px minmax(0, 1fr) auto; }
 .card.ach .count { font-size: .85rem; color: var(--muted); }
 .card.ach { transition: box-shadow .6s, border-color .6s; }
+#ach-claim { transition: box-shadow .6s; }
+#ach-claim.spot { box-shadow: 0 0 0 3px #fff3b0, 0 0 22px rgba(242, 162, 78, .75); }
 .card.ach.spot { border-color: var(--ore); box-shadow: 0 0 0 2px var(--ore), 0 0 18px rgba(242, 162, 78, .45); }
 .card.ach.done { border-color: var(--ore-deep); }
 .card.ach.done .count { background: var(--ore); border-color: var(--ore); color: var(--ore-ink); font-size: 1.2rem; }
@@ -182,9 +184,22 @@ canvas { display: block; width: 100%; height: 100%; touch-action: none; outline-
 .pip.on.t1 { background: #d58a5a; border-color: #d58a5a; } .pip.on.t2 { background: #c3cadb; border-color: #c3cadb; }
 .pip.on.t3 { background: #f2c14e; border-color: #f2c14e; } .pip.on.t4 { background: #8fe3ff; border-color: #8fe3ff; }
 .tier.tc { color: var(--ore); }
-.card.ach.mystery { border-style: dashed; opacity: .75; }
-.card.ach.mystery .count { color: var(--ore); font-size: 1.4rem; }
 .earned { margin: 6px 0 0; color: var(--muted); font: 500 .72rem/1.5 var(--f-mono); }
+.tutor .sect { text-align: center; justify-items: center; }
+.tut-kicker { color: var(--ore); font: 700 .7rem/1 var(--f-display); letter-spacing: .22em; text-transform: uppercase; }
+.tut-ico { display: grid; place-items: center; width: 72px; height: 72px; border-radius: 50%; background: var(--ink); border: 1px solid var(--ore-deep); color: var(--ore); }
+.tut-ico .ico { width: 38px; height: 38px; }
+.tutor .note { font-size: 1rem; color: var(--text); }
+.tutor .row { width: 100%; }
+.tutor .row .btn { flex: 1; }
+.tdots { display: flex; gap: 8px; }
+.tdots span { width: 8px; height: 8px; border-radius: 50%; background: var(--line); }
+.tdots span.on { background: var(--ore); }
+.beltseg { display: flex; }
+.beltseg button { position: relative; flex: 1; }
+.beltseg .badge { top: 8px; right: 10px; }
+.sw { display: inline-block; width: 14px; height: 14px; margin-right: 8px; border-radius: 50%; border: 1px solid var(--line); vertical-align: -1px; }
+.skinlist { display: grid; gap: 8px; margin-top: 8px; }
 .grp { margin: 14px 0 0; font: 700 .8rem/1 var(--f-display); letter-spacing: .16em; text-transform: uppercase; color: var(--muted); }
 .grp:first-child { margin-top: 0; }
 .card.ach .desc { margin-bottom: 6px; }
@@ -199,6 +214,8 @@ canvas { display: block; width: 100%; height: 100%; touch-action: none; outline-
 }
 .nav button { position: relative; min-height: 54px; padding: 0 2px; font: 700 .95rem var(--f-display); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
 .nav button[aria-selected="true"] { color: var(--ore); box-shadow: inset 0 2px 0 var(--ore); }
+.nav button .ico { display: block; margin: 0 auto; }
+.nav .badge { top: 10px; right: calc(50% - 18px); }
 .badge { position: absolute; top: 9px; right: 8px; width: 7px; height: 7px; border-radius: 50%; background: var(--ore); }
 #reset { white-space: nowrap; }
 .pod-wrap { padding-top: 8px; }
@@ -216,4 +233,53 @@ canvas { display: block; width: 100%; height: 100%; touch-action: none; outline-
 .nav button { letter-spacing: .05em; }
 .price { font: 600 .92rem/1.2 var(--f-mono); }
 
-@media (prefers-reduced-motion: reduce) { .toast { animation: none; } .fill { transition: none; } }
+/* Privacy policy: the hosted page's text, drawn in the game's colours. */
+.policybody { color: var(--text); font-size: .95rem; line-height: 1.55; }
+.policybody h2 { margin: 24px 0 8px; font: 800 1.25rem/1.1 var(--f-display); letter-spacing: .05em; text-transform: uppercase; }
+.policybody h2:first-child { margin-top: 0; }
+.policybody p, .policybody li { color: var(--muted); }
+.policybody p { margin: 0 0 12px; }
+.policybody ul { margin: 0 0 12px; padding-left: 20px; }
+.policybody li { margin-bottom: 6px; }
+.policybody strong { color: var(--text); }
+.policybody a, .policyfoot a { color: var(--ore); }
+.policyfoot { padding: 6px 16px calc(14px + env(safe-area-inset-bottom, 0px)); text-align: center; border-top: 1px solid var(--line); }
+.policyfoot a { display: inline-grid; place-items: center; min-height: 44px; padding: 0 12px; font-size: .85rem; }
+
+/* 8-bit mode (an easter egg, one minute): a pixel font, square corners, hard shadows and scanlines. The canvas itself is drawn at
+   a fraction of the resolution (see scene.js) and scaled up without smoothing. */
+html.retro { --f-display: 'Press Start 2P', ui-monospace, monospace; --f-mono: 'Press Start 2P', ui-monospace, monospace; }
+html.retro canvas { image-rendering: pixelated; image-rendering: crisp-edges; }
+html.retro .sect, html.retro .card, html.retro .btn, html.retro .buy, html.retro .pill, html.retro .seg, html.retro .seg button,
+html.retro .track, html.retro .fill, html.retro .toast, html.retro .welcome .sect, html.retro .dot, html.retro .achpop,
+html.retro .newpill, html.retro .tut-ico, html.retro .jx { border-radius: 0 !important; }
+html.retro .sect, html.retro .card { border-width: 2px; box-shadow: 4px 4px 0 #000; }
+html.retro .btn, html.retro .buy { border-width: 2px; }
+html.retro .ore { font-size: clamp(1.3rem, 7.5vw, 1.9rem); letter-spacing: 0; }
+html.retro .name, html.retro .sect h2, html.retro .rl-gain { font-size: .95rem; line-height: 1.3; letter-spacing: 0; }
+html.retro .meta, html.retro .rates, html.retro .stats dd, html.retro .buy .bc, html.retro .pill { font-size: .6rem; line-height: 1.6; }
+html.retro .nav button, html.retro .seg button { font-size: .62rem; }
+html.retro .beltseg button { font-size: .5rem; padding: 0 2px; letter-spacing: 0; }
+html.retro::after { content: ''; position: fixed; inset: 0; z-index: 400; pointer-events: none; background: repeating-linear-gradient(0deg, rgba(0, 0, 0, .24) 0 2px, rgba(0, 0, 0, 0) 2px 4px); }
+
+/* Splash: shown from the first paint until the game is ready, then fades out. */
+.boot {
+  position: fixed; inset: 0; z-index: 300; display: grid; place-items: center; overflow: hidden;
+  background: radial-gradient(60% 40% at 50% 42%, rgba(242, 162, 78, .16), rgba(242, 162, 78, 0) 70%), radial-gradient(120% 60% at 50% 18%, #1a2350, var(--ink) 72%) no-repeat var(--ink);
+  transition: opacity .45s ease, visibility 0s linear .45s;
+}
+.boot::before {
+  content: ''; position: absolute; inset: 0; opacity: .9; animation: twinkle 3.2s ease-in-out infinite alternate;
+  background-image:
+    radial-gradient(1.6px 1.6px at 24px 36px, #e8ebf5, transparent), radial-gradient(1.2px 1.2px at 118px 82px, rgba(232, 235, 245, .75), transparent),
+    radial-gradient(2px 2px at 172px 152px, #ffd9a8, transparent), radial-gradient(1px 1px at 66px 128px, rgba(232, 235, 245, .7), transparent),
+    radial-gradient(1.4px 1.4px at 196px 20px, rgba(232, 235, 245, .85), transparent), radial-gradient(1px 1px at 142px 190px, rgba(232, 235, 245, .6), transparent);
+  background-size: 220px 220px;
+}
+.boot.hide { opacity: 0; visibility: hidden; pointer-events: none; }
+.boot-mark { position: relative; width: min(86vw, 460px); height: auto; animation: bootIn .7s ease-out both, bootFloat 5s ease-in-out .7s infinite alternate; }
+@keyframes twinkle { from { opacity: .55; } to { opacity: 1; } }
+@keyframes bootIn { from { opacity: 0; transform: scale(.94); } to { opacity: 1; transform: none; } }
+@keyframes bootFloat { from { transform: translateY(-4px); } to { transform: translateY(5px); } }
+
+@media (prefers-reduced-motion: reduce) { .toast { animation: none; } .fill { transition: none; } .boot, .boot::before, .boot-mark { animation: none; transition: none; } }

@@ -4,7 +4,7 @@
  */
 import { Capacitor } from '@capacitor/core';
 import { Preferences } from '@capacitor/preferences';
-import { GENS, UPS, ACHS, MISSION_TYPES, GRANTED_KEEP, JOURNAL } from './data.js';
+import { GENS, UPS, ACHS, MISSION_TYPES, GRANTED_KEEP, JOURNAL, SKINS } from './data.js';
 import { fresh, WEEKLY_TYPES } from './logic.js';
 
 export const SAVE_KEY = 'oredrift.v1';
@@ -29,6 +29,7 @@ export function parseSave(raw, now = Date.now()) {
   S.allTime = Math.max(num(d.allTime, 0), S.total);
   S.taps = int(d.taps, 0);
   S.points = int(d.points, 0);
+  S.power = d.power === undefined ? S.points : int(d.power, 0); // a save from before the split: every point was one bonus step
   S.runs = int(d.runs, 0);
   // A save from the future (clock changed) must not produce negative time away.
   S.last = Math.min(num(d.last, now), now);
@@ -51,6 +52,15 @@ export function parseSave(raw, now = Date.now()) {
   for (const u of UPS) if (ups[u.id] === true) S.ups[u.id] = true;
   const ach = isObj(d.ach) ? d.ach : {};
   for (const a of ACHS) if (ach[a.id] === true) S.ach[a.id] = true;
+  S.tutorial = d.tutorial === true || S.taps > 0 || S.allTime > 0; // a save with progress has already learned the game
+  S.spent = Math.min(int(d.spent, 0), S.points); // can never have spent more than was earned
+  const skins = isObj(d.skins) ? d.skins : {};
+  for (const k of SKINS) if (skins[k.id] === true) S.skins[k.id] = true;
+  const look = isObj(d.look) ? d.look : {};
+  for (const slot of Object.keys(S.look)) {
+    const k = SKINS.find((x) => x.id === look[slot]);
+    if (k && k.slot === slot && S.skins[k.id]) S.look[slot] = k.id; // only an owned skin of the right slot can be worn
+  }
   const gifts = isObj(d.gifts) ? d.gifts : {};
   for (const a of ACHS) {
     const g = num(gifts[a.id], -1);
@@ -61,7 +71,7 @@ export function parseSave(raw, now = Date.now()) {
   S.stats = {
     comets: int(st.comets, 0), missions: int(st.missions, 0), best: int(st.best, 0),
     ships: int(st.ships, 0), drops: int(st.drops, 0), chests: int(st.chests, 0), capped: int(st.capped, 0),
-    night: int(st.night, 0), bare: int(st.bare, 0), bestRun: int(st.bestRun, 0), overdrive: int(st.overdrive, 0),
+    night: int(st.night, 0), bare: int(st.bare, 0), bestRun: int(st.bestRun, 0), overdrive: int(st.overdrive, 0), ducks: int(st.ducks, 0), retro: int(st.retro, 0),
     played: Math.max(0, num(st.played, 0)), peak: Math.max(0, num(st.peak, 0)),
   };
   S.stats.ships = Math.min(S.stats.ships, S.stats.comets); // supply ships are a subset of all flyers caught

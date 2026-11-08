@@ -3,7 +3,8 @@
  * roughly 12 units long; the caller has already translated, rotated and scaled the context.
  */
 const TAU = Math.PI * 2;
-const HULL = '#e4e8f4', MID = '#a3adc9', DARK = '#5b6483';
+const DEFAULT_PAINT = { hull: '#e4e8f4', mid: '#a3adc9', dark: '#5b6483' };
+let HULL = DEFAULT_PAINT.hull, MID = DEFAULT_PAINT.mid, DARK = DEFAULT_PAINT.dark;
 
 /** Relative size of each type, so a Stellar Collector looks bigger than a Mining Drone. */
 export const SHIP_SCALE = { drone: 0.85, laser: 1, tug: 1.05, barge: 1.2, refinery: 1.25, foundry: 1.35, collector: 1.5 };
@@ -20,9 +21,11 @@ function dot(ctx, x, y, r, fill) {
 }
 
 /**
- * opts: { glow: colour of lights and engines, t: seconds (for spinning parts), reduced: bool }
+ * opts: { glow: colour of lights and engines, t: seconds (for spinning parts), reduced: bool, paint?: { hull, mid, dark } }
  */
 export function drawShip(ctx, id, opts) {
+  const paint = opts.paint || DEFAULT_PAINT;
+  HULL = paint.hull; MID = paint.mid; DARK = paint.dark;
   const glow = opts.glow, spin = opts.reduced ? 0 : opts.t;
   switch (id) {
     case 'drone': // small diamond with two rotors

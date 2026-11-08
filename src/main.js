@@ -7,11 +7,11 @@ import '@fontsource/ibm-plex-mono/500.css';
 import '@fontsource/ibm-plex-mono/600.css';
 import './style.css';
 
-import { FRENZY_MULT } from './data.js';
+import { FRENZY_MULT, SURVEY_BONUS } from './data.js';
 import * as L from './logic.js';
 import { createScene } from './scene.js';
 import { createUI } from './ui.js';
-import { sounds, setSoundEnabled } from './audio.js';
+import { sounds, setSoundEnabled, setRetro } from './audio.js';
 import { startMusic, stopMusic } from './music.js';
 import { beltFor } from './belts.js';
 import { loadState, saveState } from './storage.js';
@@ -23,8 +23,9 @@ import * as store from './store.js';
 const PRIVACY_URL = 'https://al-creado.github.io/OreDrift/';
 const SAVE_EVERY_MS = 5000;
 /*
- * The Shop tab and Google Play Billing stay switched off until the in-app products exist in Play Console.
- * Set to true once they do (see store/listing.md). The dev-only ?mockstore flag still turns it on for a desktop try-out.
+ * The Shop tab and Google Play Billing. Switched off until the app can sell for real (production access granted, in-app
+ * products active in Play Console; see store/listing.md). Set to true then. Until Play has the products the items read
+ * "Unavailable". The dev-only ?mockstore flag turns the store on for a desktop try-out.
  */
 const SHOP_ENABLED = false;
 const shopOn = () => SHOP_ENABLED || store.isMock();
@@ -99,7 +100,7 @@ function housekeeping(now) {
   const chapters = L.journalUnlocked(S);
   if (knownChapters >= 0 && chapters.length > knownChapters) {
     const fresh = chapters.slice(knownChapters);
-    ui.toast(fresh.length === 1 ? 'New journal entry: ' + fresh[0].title + '. Read it on the Belt tab.' : fresh.length + ' new journal entries. Read them on the Belt tab.', 4500);
+    ui.toast(fresh.length === 1 ? 'New journal entry: ' + fresh[0].title + '. Read it in the Captain\'s log.' : fresh.length + ' new journal entries. Read them in the Captain\'s log.', 4500);
   }
   knownChapters = chapters.length;
 }
@@ -142,6 +143,7 @@ function onClaimAch(chainId) {
 
 function refresh() {
   const now = Date.now();
+  if (retroUntil && now >= retroUntil) endRetro();
   housekeeping(now);
   setSoundEnabled(S.sound);
   native.setHapticsEnabled(S.haptics);
@@ -163,13 +165,17 @@ function catchComet() {
   if (kind === 'ship') {
     const r = L.catchSupplyShip(S, now);
     ui.toast('Supply ship! Output ×' + FRENZY_MULT + ' for ' + r.sec + ' s.', 3500);
+  } else if (kind === 'duck') {
+    const r = L.catchDuck(S, now, Math.random(), L.cometMult(new Date(now)));
+    ui.toast('A rubber duck! +' + L.fmt(r.gain) + ' t and output ×' + FRENZY_MULT + ' for ' + r.sec + ' s. Quack!', 4500);
   } else {
     const mult = L.cometMult(new Date(now)), r = L.catchComet(S, Math.random(), mult);
     ui.toast('Comet! +' + L.fmt(r.gain) + ' t of ore' + (mult > 1 ? ' (×' + mult + ' event)' : '') + '.', 3500);
   }
   catchRun++;
   L.noteCatchRun(S, catchRun);
-  sounds.comet(); native.impact(true);
+  if (kind === 'duck') sounds.duckCaught(); else sounds.comet();
+  native.impact(true);
   refresh();
 }
 
@@ -191,13 +197,14 @@ function onBuyUp(u) {
 function onRelocate() {
   const g = L.relocate(S);
   if (!g) return;
-  ui.toast('New belt surveyed: ' + beltFor(S.runs).name + '. +' + g + ' survey point' + (g > 1 ? 's' : '') + '.', 4500);
+  ui.toast('New belt surveyed: ' + beltFor(S.runs).name + '. +1 survey point and +' + L.fmtPct(g * SURVEY_BONUS, 0) + ' bonus.', 4500);
   sounds.relocate();
   refresh(); save();
 }
 
 function onWipe() {
   S = L.fresh(Date.now());
+  S.tutorial = true; // they know the game; no need to teach it again
   lastT = Date.now();
   ui.resetUpgradeList(); ui.resetAchList();
   scene.resetComet(Date.now());
@@ -208,6 +215,55 @@ function onWipe() {
   ui.toast('Save wiped. Fresh belt.');
   syncMusic();
   if (shopOn()) syncPurchases(false); // purchases live with the Google account, so bring owned items (Remove ads, boost) straight back
+}
+
+/* ---------- easter eggs: the secret swipe code switches on 8-bit mode for a minute ---------- */
+const RETRO_MS = 60000;
+let retroUntil = 0;
+let secret = { i: 0, at: 0 };
+const retroLeft = (now) => Math.max(0, retroUntil - now);
+function setRetroMode(on) {
+  document.documentElement.classList.toggle('retro', on);
+  scene.setRetro(on);
+  setRetro(on);
+}
+function startRetro() {
+  const now = Date.now(), was = retroUntil > now;
+  L.noteRetro(S); // the "Old School" commendation
+  retroUntil = now + RETRO_MS;
+  if (!was) setRetroMode(true);
+  ui.toast('8-BIT MODE! Sixty seconds of pixels.', 3500);
+  sounds.retroOn();
+}
+function endRetro() {
+  retroUntil = 0;
+  setRetroMode(false);
+  sounds.retroOff();
+  ui.toast('Back to full colour.');
+}
+function feedSecret(input) {
+  const r = L.feedSecretCode(secret, input, Date.now());
+  secret = r.state;
+  if (r.done) startRetro();
+}
+
+function onTutorialDone() {
+  if (S.tutorial) return;
+  S.tutorial = true; save();
+}
+
+function onBuySkin(id) {
+  const k = L.skinById(id);
+  if (!L.buySkin(S, id)) return;
+  sounds.buy();
+  ui.toast(k.name + ' unlocked and worn.');
+  refresh(); save();
+}
+
+function onWearSkin(slot, id) {
+  if (!L.wearSkin(S, slot, id)) return;
+  sounds.claim();
+  refresh(); save();
 }
 
 function onClaimMission(i) {
@@ -394,6 +450,15 @@ function frame() {
   requestAnimationFrame(frame);
 }
 
+/* ---------- splash ---------- */
+const BOOT_MIN_MS = 1200; // the splash stays at least this long after the page starts, so it does not just flash
+function hideBoot() {
+  const el = document.getElementById('boot');
+  if (!el) return;
+  setTimeout(() => { el.classList.add('hide'); setTimeout(() => el.remove(), 700); }, Math.max(0, BOOT_MIN_MS - performance.now()));
+}
+setTimeout(hideBoot, 6000); // even if starting up fails, the splash never covers the screen for good
+
 /* ---------- boot ---------- */
 async function boot() {
   const loaded = await loadState(Date.now());
@@ -401,7 +466,8 @@ async function boot() {
 
   ui = createUI({
     getState: () => S,
-    onBuy, onBuyUp, onClaimMission, onClaimWeekly, onSwapMission, onSwapWeekly, rewardsOpen, onClaimChest, onClaimSupply, onClaimAch, onRelocate, onWipe, onToggleSound, onToggleHaptics, onToggleMusic,
+    retroLeft: () => retroLeft(Date.now()),
+    onBuy, onBuyUp, onClaimMission, onClaimWeekly, onSwapMission, onSwapWeekly, rewardsOpen, onClaimChest, onClaimSupply, onClaimAch, onBuySkin, onWearSkin, onTutorialDone, onRelocate, onWipe, onToggleSound, onToggleHaptics, onToggleMusic,
     onOpenJournal: () => { S.journalSeen = L.journalCount(S); save(); refresh(); },
     onToggleNotify: native.isNative() ? onToggleNotify : null,
     onRefresh: refresh,
@@ -411,7 +477,8 @@ async function boot() {
     version: 'Version ' + __APP_VERSION__,
   });
   ui.init();
-  if (PRIVACY_URL) { const a = $('privacy'); a.href = PRIVACY_URL; a.hidden = false; }
+  if (PRIVACY_URL) { const a = $('privacy-web'); a.href = PRIVACY_URL; a.hidden = false; } // the web copy, linked from the in-app policy
+  setTimeout(() => import('@fontsource/press-start-2p/400.css'), 4000); // the 8-bit mode font, fetched quietly in the background
 
   const cv = $('cv');
   scene = createScene(cv, {
@@ -419,16 +486,32 @@ async function boot() {
     flyerRate: () => L.flyerRate(new Date()),
     frenzyOn: () => L.frenzyOn(S, Date.now()),
     fleet: () => S.owned,
+    look: () => S.look,
     belt: () => S.runs,
-    onCometSpawn: (kind) => (kind === 'ship' ? sounds.shipSpawn() : sounds.cometSpawn()),
-    onCometPing: (kind) => (kind === 'ship' ? sounds.shipPing() : sounds.cometPing()),
+    onCometSpawn: (kind) => (kind === 'ship' ? sounds.shipSpawn() : kind === 'duck' ? sounds.duckSpawn() : sounds.cometSpawn()),
+    onCometPing: (kind) => (kind === 'ship' ? sounds.shipPing() : kind === 'duck' ? sounds.duckPing() : sounds.cometPing()),
     onCometMissed: () => { catchRun = 0; }, // letting one pass breaks the run of catches
   });
+  let gesture = null;
   cv.addEventListener('pointerdown', (e) => {
     e.preventDefault();
+    gesture = { x: e.clientX, y: e.clientY, id: e.pointerId };
+    try { cv.setPointerCapture(e.pointerId); } catch (err) { /* not every browser captures */ }
     const r = cv.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
     if (scene.hitComet(x, y)) catchComet(); else doTap(x, y);
   });
+  // A swipe (up, down, left or right) or a tap on the asteroid feeds the secret code.
+  cv.addEventListener('pointerup', (e) => {
+    if (!gesture || gesture.id !== e.pointerId) return;
+    const dx = e.clientX - gesture.x, dy = e.clientY - gesture.y;
+    gesture = null;
+    if (Math.hypot(dx, dy) < 48) feedSecret('t');
+    else feedSecret(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'r' : 'l') : (dy > 0 ? 'd' : 'u'));
+  });
+  cv.addEventListener('pointercancel', () => { gesture = null; });
+  // On a keyboard: the arrow keys, then B and A.
+  const KEY_CODE = { ArrowUp: 'u', ArrowDown: 'd', ArrowLeft: 'l', ArrowRight: 'r', b: 't', B: 't', a: 't', A: 't' };
+  window.addEventListener('keydown', (e) => { if (KEY_CODE[e.key]) feedSecret(KEY_CODE[e.key]); });
   cv.addEventListener('keydown', (e) => {
     if (e.key === ' ' || e.key === 'Enter') {
       e.preventDefault();
@@ -454,6 +537,8 @@ async function boot() {
   const evNow = L.activeEvent(new Date(now));
   if (evNow) ui.toast('Event: ' + evNow.name + '. ' + evNow.desc, 5000);
   refresh();
+  if (!S.tutorial) ui.showTutorial(); // first launch only
+  hideBoot();
 
   // Store first (it can restore "Remove ads" on a new phone), then ads. None of this blocks play; failure just hides the buttons.
   (async () => {

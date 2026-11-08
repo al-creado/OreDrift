@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { parseSave, serializeState } from '../src/storage.js';
 import { fresh } from '../src/logic.js';
+import { SKINS } from '../src/data.js';
 
 const NOW = 2_000_000_000_000;
 const goodSave = () => ({
@@ -24,7 +25,7 @@ describe('parseSave', () => {
     expect(S.ups).toEqual({ bits: true });
     expect(S.ach).toEqual({ t1: true });
     expect(S.gifts).toEqual({ t1: 250 });
-    expect(S.stats).toEqual({ comets: 3, missions: 4, best: 5, ships: 2, drops: 6, chests: 1, capped: 1, night: 0, bare: 0, bestRun: 0, overdrive: 0, played: 0, peak: 0 });
+    expect(S.stats).toEqual({ comets: 3, missions: 4, best: 5, ships: 2, drops: 6, chests: 1, capped: 1, night: 0, bare: 0, bestRun: 0, overdrive: 0, played: 0, peak: 0, ducks: 0, retro: 0 });
     expect(S.daily.missions).toHaveLength(3);
     expect(S.daily.chest).toBe(true);
     expect(parse(serializeState(S, NOW))).toEqual({ ...S, last: NOW });
@@ -109,12 +110,51 @@ describe('parseSave', () => {
     expect(parse({ ...goodSave(), weekly: 'x' }).weekly).toBeNull();
   });
 
+  it('skins: spent is capped at points earned, and only owned skins of the right slot can be worn', () => {
+    const rockId = SKINS.find((k) => k.slot === 'rock').id, fleetId = SKINS.find((k) => k.slot === 'fleet').id;
+    const S = parse({ ...goodSave(), points: 3, spent: 99, skins: { [rockId]: true, ghost: true }, look: { rock: rockId, fleet: fleetId, sky: 'ghost' } });
+    expect(S.spent).toBe(3);
+    expect(S.skins).toEqual({ [rockId]: true });
+    expect(S.look).toEqual({ rock: rockId, fleet: '', sky: '' }); // fleet skin is not owned, sky is unknown
+    const old = parse(goodSave());
+    expect(old.spent).toBe(0); expect(old.skins).toEqual({}); expect(old.look).toEqual({ rock: '', fleet: '', sky: '' });
+    expect(parse(serializeState(S, NOW))).toEqual({ ...S, last: NOW });
+  });
+
+  it('tutorial: new saves show it once; a save with any progress counts as seen', () => {
+    expect(parse({}).tutorial).toBe(false);
+    expect(parse({ tutorial: true }).tutorial).toBe(true);
+    expect(parse({ taps: 3 }).tutorial).toBe(true);
+    expect(parse({ allTime: 500 }).tutorial).toBe(true);
+    expect(fresh(NOW).tutorial).toBe(false);
+  });
+
+  it('8-bit mode count is read, and an older save has none', () => {
+    expect(parse({ ...goodSave(), stats: { retro: 3 } }).stats.retro).toBe(3);
+    expect(parse({ ...goodSave(), stats: { retro: -2 } }).stats.retro).toBe(0);
+    expect(parse(goodSave()).stats.retro).toBe(0);
+  });
+
+  it('ducks caught is read, and an older save has none', () => {
+    expect(parse({ ...goodSave(), stats: { comets: 9, ducks: 4 } }).stats.ducks).toBe(4);
+    expect(parse({ ...goodSave(), stats: { ducks: -3 } }).stats.ducks).toBe(0);
+    expect(parse(goodSave()).stats.ducks).toBe(0);
+  });
+
+  it('survey bonus (power): an old save keeps its bonus, a new one reads its own, junk becomes 0', () => {
+    expect(parse({ ...goodSave(), points: 7 }).power).toBe(7);                 // saved before the split: every point was a bonus step
+    expect(parse({ ...goodSave(), points: 7, power: 40 })).toMatchObject({ points: 7, power: 40 });
+    expect(parse({ ...goodSave(), points: 7, power: 'lots' }).power).toBe(0);
+    expect(parse({ ...goodSave(), points: 7, power: -4 }).power).toBe(0);
+    expect(parse(serializeState(parse({ ...goodSave(), points: 3, power: 12 }), NOW)).power).toBe(12);
+  });
+
   it('wrong container types are ignored, not fatal', () => {
     const S = parse({ ...goodSave(), owned: [1, 2], ups: 'x', ach: 5, stats: null, daily: 'x' });
     expect(S.owned).toEqual({});
     expect(S.ups).toEqual({});
     expect(S.ach).toEqual({});
-    expect(S.stats).toEqual({ comets: 0, missions: 0, best: 0, ships: 0, drops: 0, chests: 0, capped: 0, night: 0, bare: 0, bestRun: 0, overdrive: 0, played: 0, peak: 0 });
+    expect(S.stats).toEqual({ comets: 0, missions: 0, best: 0, ships: 0, drops: 0, chests: 0, capped: 0, night: 0, bare: 0, bestRun: 0, overdrive: 0, played: 0, peak: 0, ducks: 0, retro: 0 });
     expect(S.daily).toBeNull();
   });
 
@@ -154,7 +194,7 @@ describe('parseSave', () => {
 
   it('an older save without the newer stats gets zeros, and ships never exceed flyers caught', () => {
     const old = parse({ ...goodSave(), stats: { comets: 7, missions: 2, best: 3 } });
-    expect(old.stats).toEqual({ comets: 7, missions: 2, best: 3, ships: 0, drops: 0, chests: 0, capped: 0, night: 0, bare: 0, bestRun: 0, overdrive: 0, played: 0, peak: 0 });
+    expect(old.stats).toEqual({ comets: 7, missions: 2, best: 3, ships: 0, drops: 0, chests: 0, capped: 0, night: 0, bare: 0, bestRun: 0, overdrive: 0, played: 0, peak: 0, ducks: 0, retro: 0 });
     expect(parse({ ...goodSave(), stats: { comets: 3, ships: 50 } }).stats.ships).toBe(3);
     expect(parse({ ...goodSave(), stats: { comets: 3, ships: -4, drops: 'x', chests: NaN } }).stats).toMatchObject({ ships: 0, drops: 0, chests: 0 });
   });

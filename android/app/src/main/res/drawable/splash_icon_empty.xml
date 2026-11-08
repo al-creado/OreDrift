@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- An icon that draws nothing (one fully transparent square). The Android 12+ launch screen needs an icon; this keeps
+     it a plain navy screen so the in-app splash is the only picture players see. A path is included on purpose: some
+     phones ignore a vector with no content and fall back to the app icon. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M0,0h108v108h-108z" />
+</vector>

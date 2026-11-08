@@ -1,7 +1,7 @@
 /* Canvas scene: the belt's asteroid, stars, orbiting ships, comet, particles, floating text. */
-import { fmt, FIRST_COMET_MS, cometDelayMs, pickFlyer } from './logic.js';
-import { GENS } from './data.js';
-import { beltFor, allocateShips } from './belts.js';
+import { fmt, FIRST_COMET_MS, cometDelayMs, pickFlyer, isDuck } from './logic.js';
+import { GENS, SKINS } from './data.js';
+import { beltFor, allocateShips, skinRockColors } from './belts.js';
 import { drawShip, SHIP_SCALE } from './ships.js';
 
 const flyerRate = (hooks) => (hooks.flyerRate ? hooks.flyerRate() : 1);
@@ -11,11 +11,12 @@ const TAU = Math.PI * 2;
 const COMET_LIFE = 8;
 const COMET_HIT_PX = 44;
 const COMET_PING_S = 1.6;
+const DUCK_COLOR = '#ffd23f'; // a rubber duck: the rare yellow flyer
 const SHIP_COLOR = '#7fe3ff'; // supply ships glow cyan, comets glow orange, so they can be told apart at a glance
 const VESSEL_IDS = GENS.map((g) => g.id);
 
 /**
- * hooks: { reduced: bool, frenzyOn(): bool, fleet(): { vesselId: count }, belt(): relocation count,
+ * hooks: { look?(): the skin worn per slot, reduced: bool, frenzyOn(): bool, fleet(): { vesselId: count }, belt(): relocation count,
  *          flyerRate?(): how many times as often flyers come (an event), onCometSpawn?(kind), onCometPing?(kind), onCometMissed?() }  kind is 'ship' (supply ship) or 'comet'
  * Returns the scene controller.
  */
@@ -27,16 +28,25 @@ export function createScene(cv, hooks) {
   const REDUCED = hooks.reduced;
 
   let W = 0, H = 0, DPR = 1;
+  let retro = false; // 8-bit mode: drawn at a fraction of the screen's resolution, then scaled up with hard pixels
   let rot = 0, pulse = 0, glow = 0.12, tClock = 0;
   let comet = null, nextComet = 0, pingT = 0;
   const flyerHistory = []; // kinds that appeared recently, so two comets in a row are followed by a supply ship
   const fx = { chips: [], texts: [] };
 
   /* ---- the current belt: shape, colours and ring change with every relocation ---- */
-  let curRuns = -1, B = beltFor(0);
+  let curKey = '', B = beltFor(0), paint = null, sky = null;
+  const skinOf = (id) => SKINS.find((k) => k.id === id) || null;
   function syncBelt() {
-    const runs = hooks.belt();
-    if (runs !== curRuns) { curRuns = runs; B = beltFor(runs); }
+    const runs = hooks.belt(), look = hooks.look ? hooks.look() : {};
+    const key = runs + '|' + (look.rock || '') + '|' + (look.fleet || '') + '|' + (look.sky || '');
+    if (key === curKey) return;
+    curKey = key;
+    B = beltFor(runs);
+    const rock = skinOf(look.rock);
+    if (rock) B = { ...B, ...skinRockColors(rock) }; // a rock skin recolours the belt; the shape stays
+    paint = (skinOf(look.fleet) || {}).paint || null;
+    sky = (skinOf(look.sky) || {}).sky || null;
   }
   const mid = (a, b) => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
   function rockPath(c) {
@@ -58,7 +68,7 @@ export function createScene(cv, hooks) {
   function resize() {
     const r = cv.getBoundingClientRect();
     if (!r.width || !r.height) return;
-    DPR = Math.min(window.devicePixelRatio || 1, 2.5);
+    DPR = retro ? 0.4 : Math.min(window.devicePixelRatio || 1, 2.5);
     W = r.width; H = r.height;
     cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
@@ -72,7 +82,7 @@ export function createScene(cv, hooks) {
   function updateComet(dt, now) {
     if (!comet) {
       if (W && now >= nextComet) {
-        comet = { kind: pickFlyer(Math.random(), flyerHistory), t: 0, life: COMET_LIFE, dir: Math.random() < 0.5 ? 1 : -1, ph: Math.random() * TAU };
+        comet = { kind: isDuck(Math.random()) ? 'duck' : pickFlyer(Math.random(), flyerHistory), t: 0, life: COMET_LIFE, dir: Math.random() < 0.5 ? 1 : -1, ph: Math.random() * TAU };
         flyerHistory.push(comet.kind);
         if (flyerHistory.length > 4) flyerHistory.shift();
         pingT = 0;
@@ -93,13 +103,13 @@ export function createScene(cv, hooks) {
     const q = cometPos(comet);
     return Math.hypot(x - q[0], y - q[1]) <= COMET_HIT_PX;
   };
-  /** Removes the flyer, bursts particles and schedules the next one. Returns its kind ('ship' or 'comet'), or null if none was on screen. */
+  /** Removes the flyer, bursts particles and schedules the next one. Returns its kind ('ship', 'comet' or 'duck'), or null if none was on screen. */
   function catchComet(now) {
     if (!comet) return null;
     const q = cometPos(comet), kind = comet.kind;
     comet = null;
     nextComet = now + cometDelayMs(true, Math.random(), flyerRate(hooks));
-    const colors = kind === 'ship' ? [SHIP_COLOR, '#e0f8ff'] : [ORE, ORE_HI];
+    const colors = kind === 'ship' ? [SHIP_COLOR, '#e0f8ff'] : kind === 'duck' ? [DUCK_COLOR, '#fff3b0'] : [ORE, ORE_HI];
     for (let i = 0; i < (REDUCED ? 4 : 14); i++) {
       const a = Math.random() * TAU, sp = 60 + Math.random() * 140;
       fx.chips.push({ x: q[0], y: q[1], vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: 0, max: 0.6 + Math.random() * 0.5, s: 2 + Math.random() * 3, r: Math.random() * 6, vr: (Math.random() - 0.5) * 10, c: Math.random() < 0.7 ? colors[0] : colors[1] });
@@ -148,10 +158,15 @@ export function createScene(cv, hooks) {
     syncBelt();
     tClock += dt;
     ctx.clearRect(0, 0, W, H);
+    if (sky && sky.nebula) {
+      const ng = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, Math.max(W, H) * 0.7);
+      ng.addColorStop(0, sky.nebula + '3a'); ng.addColorStop(1, sky.nebula + '00');
+      ctx.fillStyle = ng; ctx.fillRect(0, 0, W, H);
+    }
     for (const s of stars) {
       s.x -= s.sp * dt; if (s.x < 0) s.x += 1;
       ctx.globalAlpha = Math.max(0.1, 0.35 + 0.45 * Math.sin(tClock * s.tw + s.ph));
-      ctx.fillStyle = STAR; ctx.beginPath(); ctx.arc(s.x * W, s.y * H, s.s, 0, TAU); ctx.fill();
+      ctx.fillStyle = (sky && sky.star) || STAR; ctx.beginPath(); ctx.arc(s.x * W, s.y * H, s.s, 0, TAU); ctx.fill();
     }
     ctx.globalAlpha = 1;
     const cx = W / 2, cy = H / 2 + 2, base = Math.min(W * 0.42, H * 0.36);
@@ -195,19 +210,30 @@ export function createScene(cv, hooks) {
       }
       const k = k0 * (SHIP_SCALE[ships[i]] || 1);
       ctx.save(); ctx.translate(x, y); ctx.rotate(h); ctx.scale(k, k);
-      drawShip(ctx, ships[i], { glow: B.vein, t: tClock + i, reduced: REDUCED });
+      drawShip(ctx, ships[i], { glow: B.vein, t: tClock + i, reduced: REDUCED, paint });
       ctx.restore();
     }
 
     if (comet) {
-      const isShip = comet.kind === 'ship', trailColor = isShip ? SHIP_COLOR : ORE;
+      const isShip = comet.kind === 'ship', isDuckNow = comet.kind === 'duck', trailColor = isShip ? SHIP_COLOR : isDuckNow ? DUCK_COLOR : ORE;
       for (let k = 14; k >= 1; k--) {
         const tt = comet.t - k * 0.1; if (tt < 0) continue;
         const q = cometPos({ t: tt, life: comet.life, dir: comet.dir, ph: comet.ph });
         ctx.globalAlpha = (1 - k / 15) * (isShip ? 0.35 : 0.5); ctx.fillStyle = trailColor; ctx.beginPath(); ctx.arc(q[0], q[1], (isShip ? 5 : 7) * (1 - k / 16), 0, TAU); ctx.fill();
       }
       const q = cometPos(comet), ringR = 24 + (REDUCED ? 0 : 4 * Math.sin(tClock * 6));
-      if (isShip) {
+      if (isDuckNow) {
+        // A rubber duck, bobbing along and facing the way it travels.
+        const bob = REDUCED ? 0 : Math.sin(tClock * 5) * 2.2, flap = REDUCED ? 0 : Math.sin(tClock * 9) * 0.35;
+        ctx.globalAlpha = 1; ctx.save(); ctx.translate(q[0], q[1] + bob); ctx.rotate(REDUCED ? 0 : Math.sin(tClock * 3) * 0.1); ctx.scale(comet.dir * 2.6, 2.6);
+        ctx.fillStyle = DUCK_COLOR; ctx.beginPath(); ctx.ellipse(0, 2, 7, 5, 0, 0, TAU); ctx.fill();
+        ctx.beginPath(); ctx.moveTo(-6, 0); ctx.lineTo(-10.5, -3); ctx.lineTo(-6.5, 2); ctx.closePath(); ctx.fill();
+        ctx.beginPath(); ctx.arc(4, -4, 3.7, 0, TAU); ctx.fill();
+        ctx.fillStyle = '#ff8c1a'; ctx.beginPath(); ctx.moveTo(7, -4.6); ctx.lineTo(11.5, -3.2); ctx.lineTo(7, -2); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = '#f2b705'; ctx.save(); ctx.translate(-1, 2); ctx.rotate(-0.25 + flap); ctx.beginPath(); ctx.ellipse(0, 0, 3.8, 2.3, 0, 0, TAU); ctx.fill(); ctx.restore();
+        ctx.fillStyle = '#1c1206'; ctx.beginPath(); ctx.arc(5.2, -5.1, 0.85, 0, TAU); ctx.fill();
+        ctx.restore();
+      } else if (isShip) {
         // A cargo ship heading along its path, with a pulsing cyan ring so it reads as something to tap.
         const ahead = cometPos({ t: comet.t + 0.1, life: comet.life, dir: comet.dir, ph: comet.ph });
         ctx.globalAlpha = 1; ctx.save(); ctx.translate(q[0], q[1]); ctx.rotate(Math.atan2(ahead[1] - q[1], ahead[0] - q[0])); ctx.scale(2.6, 2.6);
@@ -227,7 +253,7 @@ export function createScene(cv, hooks) {
       const drag = Math.pow(0.04, dt); p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= drag; p.vy *= drag; p.r += p.vr * dt;
       ctx.save(); ctx.globalAlpha = 1 - p.life / p.max; ctx.translate(p.x, p.y); ctx.rotate(p.r); ctx.fillStyle = p.c; ctx.fillRect(-p.s / 2, -p.s / 2, p.s, p.s); ctx.restore();
     }
-    ctx.font = '600 16px ' + MONO; ctx.textAlign = 'center'; ctx.lineWidth = 3; ctx.lineJoin = 'round';
+    ctx.font = '600 ' + (retro ? 34 : 16) + 'px ' + MONO; ctx.textAlign = 'center'; ctx.lineWidth = retro ? 6 : 3; ctx.lineJoin = 'round';
     for (let i = fx.texts.length - 1; i >= 0; i--) {
       const p = fx.texts[i]; p.life += dt;
       if (p.life >= p.max) { fx.texts.splice(i, 1); continue; }
@@ -239,6 +265,7 @@ export function createScene(cv, hooks) {
 
   return {
     resize, draw, spawnTap, hitComet, catchComet, resetComet,
+    setRetro: (on) => { if (retro === on) return; retro = on; resize(); },
     updateComet,
     ready: () => W > 0,
     size: () => [W, H],

@@ -4,8 +4,8 @@
  * Mutating functions say so and return plain results the UI turns into toasts and sounds.
  */
 import {
-  GENS, UPS, ACHS, MILESTONES, GROWTH, OFFLINE_CAP, OFFLINE_RATE, PRESTIGE_BASE,
-  FRENZY_MULT, FRENZY_MAX_MS, ACH_BONUS, ACH_GIFT, RANKS, CHAIN_TITLES, JOURNAL, SURVEY_BONUS, MAX_BUY, MISSION_TYPES, TAP_TARGETS,
+  GENS, UPS, ACHS, MILESTONES, GROWTH, OFFLINE_CAP, OFFLINE_RATE, PRESTIGE_BASE, PRESTIGE_GROWTH_DIV, PRESTIGE_GROWTH_POW,
+  FRENZY_MULT, FRENZY_MAX_MS, SKINS, ACH_BONUS, ACH_GIFT, RANKS, CHAIN_TITLES, JOURNAL, SURVEY_BONUS, MAX_BUY, MISSION_TYPES, TAP_TARGETS,
   PRODUCTS, BOOST_MULT, GRANTED_KEEP,
 } from './data.js';
 
@@ -58,12 +58,14 @@ export function fmtDur(sec) {
 /* ---------- state ---------- */
 export function fresh(now = 0) {
   return {
-    ore: 0, total: 0, allTime: 0, taps: 0, points: 0, runs: 0,
+    ore: 0, total: 0, allTime: 0, taps: 0, points: 0, power: 0, runs: 0, // points: survey points (exactly 1 per relocation, spent on skins). power: survey bonus steps, each +10% output
     owned: {}, ups: {}, last: now, sound: true, music: true, haptics: true, ach: {},
-    stats: { comets: 0, missions: 0, best: 0, ships: 0, drops: 0, chests: 0, capped: 0, night: 0, bare: 0, bestRun: 0, overdrive: 0, played: 0, peak: 0 },
+    stats: { comets: 0, missions: 0, best: 0, ships: 0, drops: 0, chests: 0, capped: 0, night: 0, bare: 0, bestRun: 0, overdrive: 0, played: 0, peak: 0, ducks: 0, retro: 0 },
     streak: 0, lastSupply: '', daily: null, weekly: null, frenzyUntil: 0, notify: false, podReadyAt: 0,
     iap: { removeAds: false, starter: false, boost: false }, granted: [], journalSeen: 0,
     gifts: {}, // commendation id -> ore gift waiting to be claimed
+    tutorial: false, // the how-to-play card has been seen
+    spent: 0, skins: {}, look: { rock: '', fleet: '', sky: '' }, // cosmetics: survey points spent, skins owned, skin worn per slot
   };
 }
 
@@ -75,8 +77,10 @@ export function milestoneMult(n) {
   for (const k of MILESTONES) if (n >= k) m *= 2;
   return m;
 }
-export const surveyMult = (S) => 1 + SURVEY_BONUS * S.points;
+export const surveyMult = (S) => 1 + SURVEY_BONUS * S.power;
 export const achCount = (S) => ACHS.reduce((a, x) => a + (S.ach[x.id] ? 1 : 0), 0);
+/** True once every secret commendation has been earned. Until then the total number of commendations is not shown. */
+export const secretsDone = (S) => ACHS.every((a) => !a.secret || S.ach[a.id]);
 /** Permanent bonus of one commendation: the original 32 give +1%, newer ones +0.5%. */
 export const achBonus = (a) => (a.bonus === undefined ? ACH_BONUS : a.bonus);
 export const achBonusTotal = (S) => ACHS.reduce((t, a) => t + (S.ach[a.id] ? achBonus(a) : 0), 0);
@@ -200,38 +204,67 @@ export function trackPlay(S, sec) {
 }
 
 /* ---------- relocate ---------- */
-export const prestigeGain = (S) => Math.floor(Math.sqrt(S.total / PRESTIGE_BASE));
-export const nextPointAt = (S) => Math.pow(prestigeGain(S) + 1, 2) * PRESTIGE_BASE;
+/** Ore in one run that earns the first survey bonus step. It grows with the steps already held, so relocating cannot be spammed. */
+export const pointCost = (S) => PRESTIGE_BASE * Math.pow(1 + S.power / PRESTIGE_GROWTH_DIV, PRESTIGE_GROWTH_POW);
+export const prestigeGain = (S) => Math.floor(Math.sqrt(S.total / pointCost(S)));
+export const nextPointAt = (S) => Math.pow(prestigeGain(S) + 1, 2) * pointCost(S);
 
 /**
  * What relocating right now would do, for the Belt tab. Does not change S.
- * bonusBefore/After are the whole "all output and taps" bonus (survey points x commendations x shop boost), as shown in the header.
+ * `gain` is the number of survey bonus steps (each +10% output and taps) a relocation would add; a relocation always adds exactly
+ * 1 survey point as well. bonusBefore/After are the whole "all output and taps" bonus (survey bonus x commendations x shop boost), as shown in the header.
  */
 export function relocatePreview(S) {
   const gain = prestigeGain(S);
-  const lower = gain * gain * PRESTIGE_BASE, upper = (gain + 1) * (gain + 1) * PRESTIGE_BASE;
+  const cost = pointCost(S), lower = gain * gain * cost, upper = (gain + 1) * (gain + 1) * cost;
   const other = achMult(S) * iapMult(S);
-  const before = surveyMult(S) * other, after = (1 + SURVEY_BONUS * (S.points + gain)) * other;
+  const before = surveyMult(S) * other, after = (1 + SURVEY_BONUS * (S.power + gain)) * other;
   return {
     gain,
-    pointsBefore: S.points, pointsAfter: S.points + gain,
-    surveyBefore: surveyMult(S) - 1, surveyAfter: SURVEY_BONUS * (S.points + gain),
+    pointsBefore: S.points, pointsAfter: S.points + (gain >= 1 ? 1 : 0), // one survey point per relocation, however big the run
+    surveyBefore: surveyMult(S) - 1, surveyAfter: SURVEY_BONUS * (S.power + gain),
     bonusBefore: before - 1, bonusAfter: after - 1,
     ratio: after / before,
-    progress: Math.max(0, Math.min(1, (S.total - lower) / (upper - lower))), // toward the next survey point
+    progress: Math.max(0, Math.min(1, (S.total - lower) / (upper - lower))), // toward the next bonus step
     nextAt: upper,
     lose: { ore: S.ore, vessels: fleetCount(S), upgrades: upCount(S), run: S.total },
   };
 }
 
-/** Mutates S. Returns the points gained (0 = refused). */
+/** Mutates S. Gives exactly 1 survey point and the run's bonus steps. Returns the bonus steps gained (0 = refused). */
 export function relocate(S) {
   const g = prestigeGain(S);
   if (g < 1) return 0;
   if (upCount(S) === 0) S.stats.bare++; // left without installing a single upgrade
-  S.points += g; S.runs++;
+  S.points += 1; S.power += g; S.runs++;
   S.ore = 0; S.total = 0; S.owned = {}; S.ups = {};
   return g;
+}
+
+/* ---------- cosmetic skins ---------- */
+export const skinById = (id) => SKINS.find((k) => k.id === id) || null;
+/** Survey points free to spend. The survey bonus itself uses S.power, so spending points never lowers it. */
+export const spendablePoints = (S) => Math.max(0, S.points - S.spent);
+export const owns_skin = (S, id) => S.skins[id] === true;
+/** The skin worn in a slot, or null for the default look. */
+export const wornSkin = (S, slot) => {
+  const k = skinById(S.look[slot]);
+  return k && k.slot === slot && S.skins[k.id] ? k : null;
+};
+/** Buys a skin with spare survey points and wears it. Mutates S. Returns false when refused. */
+export function buySkin(S, id) {
+  const k = skinById(id);
+  if (!k || S.skins[id] || spendablePoints(S) < k.cost) return false;
+  S.spent += k.cost; S.skins[id] = true; S.look[k.slot] = id;
+  return true;
+}
+/** Wears an owned skin, or the default look for a slot when id is '' (pass the slot then). Mutates S. */
+export function wearSkin(S, slot, id) {
+  if (id === '') { S.look[slot] = ''; return true; }
+  const k = skinById(id);
+  if (!k || k.slot !== slot || !S.skins[id]) return false;
+  S.look[slot] = id;
+  return true;
 }
 
 /* ---------- commendations ---------- */
@@ -252,7 +285,8 @@ export function statValue(S, stat) {
     case 'maxVessel': return maxVessel(S);
     case 'upgrades': return upCount(S);
     case 'runs': return S.runs;
-    case 'points': return S.points;
+    case 'power': return S.power;
+    case 'retro': return S.stats.retro;
     case 'comets': return S.stats.comets;
     case 'ships': return S.stats.ships;
     case 'cometsOnly': return Math.max(0, S.stats.comets - S.stats.ships);
@@ -629,6 +663,50 @@ export function catchComet(S, rand, mult = 1) {
   const g = minutesOfOre(S, minutes, COMET_FLOOR) * mult;
   gain(S, g, true);
   return { kind: 'ore', gain: g, minutes };
+}
+
+/* ---------- easter eggs ---------- */
+/** Mutates S. Call when 8-bit mode has been switched on by the secret code. */
+export function noteRetro(S) { S.stats.retro++; }
+
+/** About one flyer in thirty-three is a rubber duck instead. `r` is a 0..1 random value. */
+export const DUCK_CHANCE = 0.03;
+export const isDuck = (r) => r < DUCK_CHANCE;
+export const DUCK_MIN_MINUTES = 30;
+export const DUCK_MAX_MINUTES = 60;
+export const DUCK_FLOOR = 2000;
+export const DUCK_BOOST_SECONDS = 20;
+
+/** Mutates S. A rubber duck pays 30 to 60 minutes of current output and a short boost; rand is 0..1. Counts as a flyer caught. */
+export function catchDuck(S, now, rand, mult = 1) {
+  S.stats.comets++;
+  S.stats.ducks++;
+  addProg(S, 'comet', 1);
+  const minutes = DUCK_MIN_MINUTES + rand * (DUCK_MAX_MINUTES - DUCK_MIN_MINUTES);
+  const g = minutesOfOre(S, minutes, DUCK_FLOOR) * mult;
+  gain(S, g, true);
+  startFrenzy(S, now, DUCK_BOOST_SECONDS);
+  return { kind: 'duck', gain: g, minutes, sec: DUCK_BOOST_SECONDS };
+}
+
+/**
+ * The secret swipe code: up, up, down, down, left, right, left, right, then two taps.
+ * `state` is { i, at } (how far along, and when the last input came). Returns { state, done }.
+ * A wrong input falls back to the longest tail that still starts the code, and a pause of more than 3 seconds starts over.
+ */
+export const SECRET_CODE = ['u', 'u', 'd', 'd', 'l', 'r', 'l', 'r', 't', 't'];
+export const SECRET_GAP_MS = 3000;
+export function feedSecretCode(state, input, now) {
+  let i = state.i;
+  if (i > 0 && now - state.at > SECRET_GAP_MS) i = 0;
+  if (input === SECRET_CODE[i] && i + 1 === SECRET_CODE.length) return { state: { i: 0, at: now }, done: true };
+  // Keep the longest tail of what was entered that still starts the code, so an extra swipe does not lose your place.
+  const seq = [...SECRET_CODE.slice(0, i), input];
+  let next = 0;
+  for (let k = Math.min(seq.length, SECRET_CODE.length - 1); k > 0; k--) {
+    if (seq.slice(seq.length - k).every((x, j) => x === SECRET_CODE[j])) { next = k; break; }
+  }
+  return { state: { i: next, at: now }, done: false };
 }
 
 /* ---------- rewarded ad: cargo pod ---------- */

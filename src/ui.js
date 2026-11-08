@@ -1,7 +1,9 @@
 /* DOM building and updating: HUD, tabs, cards, goals, toasts. Reads state, never changes rules. */
-import { GENS, UPS, ACHS, MILESTONES, FRENZY_MULT, PRODUCTS, ACH_GROUPS, TIER_NAMES, RANKS, JOURNAL } from './data.js';
+import { GENS, UPS, ACHS, MILESTONES, FRENZY_MULT, PRODUCTS, ACH_GROUPS, TIER_NAMES, RANKS, JOURNAL, SKINS, SKIN_SLOTS } from './data.js';
 import * as L from './logic.js';
-import { beltFor } from './belts.js';
+import { beltFor, skinRockColors } from './belts.js';
+import { icon } from './icons.js';
+import policyHtml from '../docs/index.html?raw'; // the hosted privacy policy page: one file feeds the web page and this in-app copy
 
 const $ = (id) => document.getElementById(id);
 const setText = (el, s) => { if (el.textContent !== s) el.textContent = s; };
@@ -59,6 +61,26 @@ export function createUI(h) {
   function closeJournal() {
     if ($('journal').hidden) return false;
     $('journal').hidden = true;
+    return true;
+  }
+
+  /* ---------- privacy policy (the same text as the hosted page) ---------- */
+  let policyBuilt = false;
+  function openPolicy() {
+    if (!policyBuilt) {
+      const doc = new DOMParser().parseFromString(policyHtml, 'text/html');
+      const title = doc.body.querySelector('h1'); if (title) title.remove(); // the overlay has its own heading
+      doc.body.querySelectorAll('a[href^="http"]').forEach((a) => { a.target = '_blank'; a.rel = 'noopener'; });
+      $('policy-body').innerHTML = doc.body.innerHTML;
+      policyBuilt = true;
+    }
+    $('policy').hidden = false; $('policy-body').scrollTop = 0;
+    $('policy-close').focus();
+  }
+  /** Returns true if the policy was open (so the back button knows it handled the press). */
+  function closePolicy() {
+    if ($('policy').hidden) return false;
+    $('policy').hidden = true;
     return true;
   }
 
@@ -137,7 +159,39 @@ export function createUI(h) {
     $('welcome').hidden = true;
     return true;
   }
-  const closeOverlay = () => closeWelcome() || closeJournal();
+  /* ---------- how to play: four short steps ---------- */
+  const TUTORIAL = [
+    { icon: 'tap', title: 'Mine', text: 'Tap the asteroid to mine ore.' },
+    { icon: 'fleet', title: 'Hire', text: 'Spend ore on vessels in Fleet. They keep mining while you are away.' },
+    { icon: 'goals', title: 'Collect', text: 'Catch comets and ships. Claim daily rewards in Goals.' },
+    { icon: 'belt', title: 'Relocate', text: 'Reset in Belt for permanent bonuses and new skins.' },
+  ];
+  let tutStep = 0;
+  const tutorialOpen = () => !$('tutor').hidden;
+  function renderTutorial() {
+    const t = TUTORIAL[tutStep], last = tutStep === TUTORIAL.length - 1;
+    setText($('tut-kicker'), tutStep === 0 ? 'Welcome to the Drift' : "Captain's orders");
+    $('tut-ico').innerHTML = icon(t.icon, 38);
+    setText($('tut-title'), t.title); setText($('tut-text'), t.text);
+    $('tut-dots').querySelectorAll('span').forEach((d, i) => d.classList.toggle('on', i === tutStep));
+    setText($('tut-next'), last ? 'Start mining' : 'Next');
+    $('tut-skip').hidden = last;
+    $('tut-next').focus();
+  }
+  function showTutorial() {
+    tutStep = 0;
+    $('tut-dots').innerHTML = TUTORIAL.map(() => '<span></span>').join('');
+    $('tutor').hidden = false;
+    renderTutorial();
+  }
+  /** Returns true if the card was open (so the back button knows it handled the press). */
+  function closeTutorial() {
+    if (!tutorialOpen()) return false;
+    $('tutor').hidden = true;
+    h.onTutorialDone();
+    return true;
+  }
+  const closeOverlay = () => closeTutorial() || closePolicy() || closeWelcome() || closeJournal();
 
   /* ---------- fleet ---------- */
   const cards = {};
@@ -229,23 +283,86 @@ export function createUI(h) {
   }
   const resetUpgradeList = () => { upKey = ''; };
 
+  /* ---------- cosmetics: skins bought with spare survey points ---------- */
+  const skinEls = [];
+  const swatch = (k) => {
+    if (!k) return '#464c68'; // the default look
+    if (k.slot === 'rock') { const c = skinRockColors(k); return 'linear-gradient(135deg, ' + c.rock + ' 50%, ' + c.vein + ' 50%)'; }
+    if (k.slot === 'fleet') return 'linear-gradient(135deg, ' + k.paint.hull + ' 50%, ' + k.paint.mid + ' 50%)';
+    return 'linear-gradient(135deg, ' + (k.sky.nebula || '#0b1020') + ' 50%, ' + k.sky.star + ' 50%)';
+  };
+  function buildSkins() {
+    const host = $('skins'); host.textContent = ''; skinEls.length = 0;
+    SKIN_SLOTS.forEach((slot) => {
+      const g = document.createElement('h3'); g.className = 'grp'; g.textContent = slot.name; host.appendChild(g);
+      const n = document.createElement('p'); n.className = 'note'; n.textContent = slot.note; host.appendChild(n);
+      const list = document.createElement('div'); list.className = 'skinlist'; host.appendChild(list);
+      const defaults = { id: '', slot: slot.id, name: slot.id === 'rock' ? 'Belt colours' : 'Standard', cost: 0, meta: slot.id === 'rock' ? 'Changes with each belt.' : 'The original look.' };
+      [defaults, ...SKINS.filter((k) => k.slot === slot.id)].forEach((k) => {
+        const el = document.createElement('article'); el.className = 'card up';
+        el.innerHTML = '<div class="info"><h3 class="name"><span class="sw"></span><span class="nm"></span></h3><p class="meta"></p></div><button class="buy" type="button"><span class="bn"></span><span class="bc"></span></button>';
+        el.querySelector('.sw').style.background = swatch(k.id ? k : null);
+        el.querySelector('.nm').textContent = k.name;
+        const c = { skin: k, meta: el.querySelector('.meta'), btn: el.querySelector('.buy'), bn: el.querySelector('.bn'), bc: el.querySelector('.bc') };
+        c.btn.addEventListener('click', () => { if (!k.id || L.owns_skin(S(), k.id)) h.onWearSkin(slot.id, k.id); else h.onBuySkin(k.id); });
+        list.appendChild(el); skinEls.push(c);
+      });
+    });
+  }
+  function updateSkins(s) {
+    const spare = L.spendablePoints(s);
+    setText($('skin-pts'), String(spare));
+    setText($('skin-note'), 'Skins are bought with survey points, 1 for every relocation. They only change how the game looks, and spending points never lowers your bonus.');
+    skinEls.forEach((c) => {
+      const k = c.skin, worn = k.id ? L.wornSkin(s, k.slot) === k : !L.wornSkin(s, k.slot);
+      const owned = !k.id || L.owns_skin(s, k.id);
+      setText(c.meta, owned ? (k.meta || 'Owned') : 'Costs ' + k.cost + ' survey point' + (k.cost === 1 ? '' : 's'));
+      if (worn) setBtn(c, false, 'Worn', '');
+      else if (owned) setBtn(c, true, 'Wear', '');
+      else setBtn(c, spare >= k.cost, 'Buy', k.cost + ' survey pt' + (k.cost === 1 ? '' : 's'));
+    });
+  }
+
   /* ---------- belt ---------- */
-  function updateBelt(s) {
-    if (activeTab !== 'belt') return;
-    const pv = L.relocatePreview(s), g = pv.gain;
-    setText($('pts'), String(s.points));
+  let beltView = 'relocate'; // relocate | cosmetics | more
+  function setBeltView(v) {
+    beltView = v;
+    document.querySelectorAll('#beltseg button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === v)));
+    document.querySelectorAll('[data-bview]').forEach((el) => { el.hidden = el.dataset.bview !== v; });
+  }
+  /* ---------- captain's log: journal and logbook ---------- */
+  function updateCaptain(s) {
+    if (activeTab !== 'captain') return;
     const chapters = L.journalCount(s);
     setText($('jnote'), chapters + ' of ' + JOURNAL.length + ' chapters unlocked. A story of the Drift, told as you go.');
     $('jnew').hidden = chapters <= s.journalSeen;
+    setText($('st-all'), L.fmt(s.allTime) + ' t'); setText($('st-run'), L.fmt(s.total) + ' t');
+    setText($('st-taps'), s.taps.toLocaleString('en-US'));
+    setText($('st-fleet'), String(L.fleetCount(s)));
+    setText($('st-runs'), String(s.runs));
+    $('st-duck-k').hidden = $('st-duck').hidden = !(s.stats.ducks > 0); // stays secret until the first duck
+    setText($('st-duck'), String(s.stats.ducks || 0));
+    setText($('st-comets'), String(s.stats.comets)); setText($('st-missions'), String(s.stats.missions));
+    setText($('st-played'), L.fmtDur(s.stats.played)); setText($('st-peak'), L.fmt(s.stats.peak) + ' t/s'); setText($('st-run-best'), String(s.stats.bestRun));
+    setText($('st-best'), s.stats.best + (s.stats.best === 1 ? ' day' : ' days')); setText($('st-ach'), L.secretsDone(s) ? L.achCount(s) + ' of ' + ACHS.length : String(L.achCount(s))); // the total stays a secret until every secret one is found
+    setText($('st-rank'), L.rankFor(L.achCount(s)).name);
+  }
+
+  function updateBelt(s) {
+    if (activeTab !== 'belt') return;
+    $('bs-relocate').hidden = L.prestigeGain(s) < 1;           // a relocation is ready
+    const pv = L.relocatePreview(s), g = pv.gain;
+    setText($('pts'), String(s.points));
+    updateSkins(s);
     setText($('beltname'), 'Current belt: ' + beltFor(s.runs).name);
     $('relocate').disabled = g < 1;
 
     // What relocating gives (and costs), spelled out.
     setText($('rl-gain'), g >= 1
-      ? '+' + g + ' survey point' + (g > 1 ? 's' : '') + ': everything you earn ×' + pv.ratio.toFixed(2)
+      ? '+1 survey point, and everything you earn ×' + pv.ratio.toFixed(2)
       : 'Not yet: ' + L.fmt(Math.max(0, pv.nextAt - s.total)) + ' t to go');
     setFill($('rl-fill'), pv.progress * 100);
-    setText($('relnote'), (g >= 1 ? 'The next survey point' : 'Your first survey point') + ' comes at ' + L.fmt(pv.nextAt) + ' t this run (' + L.fmt(s.total) + ' so far). The bar shows the way there.');
+    setText($('relnote'), (g >= 1 ? 'More bonus' : 'Your first bonus') + ' comes at ' + L.fmt(pv.nextAt) + ' t this run (' + L.fmt(s.total) + ' so far). The bar shows the way there.');
     $('rl-detail').hidden = g < 1;
     setText($('rl-pts'), pv.pointsBefore + ' → ' + pv.pointsAfter);
     setText($('rl-sb'), '+' + pct(pv.surveyBefore) + ' → +' + pct(pv.surveyAfter));
@@ -253,14 +370,6 @@ export function createUI(h) {
     setText($('rl-belt'), beltFor(s.runs).name + ' → ' + beltFor(s.runs + 1).name);
     const lose = pv.lose;
     setText($('rl-lose'), L.fmt(lose.ore) + ' t of ore, ' + lose.vessels + ' vessel' + (lose.vessels === 1 ? '' : 's') + ', ' + lose.upgrades + ' upgrade' + (lose.upgrades === 1 ? '' : 's') + ' and this run\'s ' + L.fmt(lose.run) + ' t of progress.');
-    setText($('st-all'), L.fmt(s.allTime) + ' t'); setText($('st-run'), L.fmt(s.total) + ' t');
-    setText($('st-taps'), s.taps.toLocaleString('en-US'));
-    setText($('st-fleet'), String(L.fleetCount(s)));
-    setText($('st-runs'), String(s.runs));
-    setText($('st-comets'), String(s.stats.comets)); setText($('st-missions'), String(s.stats.missions));
-    setText($('st-played'), L.fmtDur(s.stats.played)); setText($('st-peak'), L.fmt(s.stats.peak) + ' t/s'); setText($('st-run-best'), String(s.stats.bestRun));
-    setText($('st-best'), s.stats.best + (s.stats.best === 1 ? ' day' : ' days')); setText($('st-ach'), L.achCount(s) + ' of ' + ACHS.length);
-    setText($('st-rank'), L.rankFor(L.achCount(s)).name);
     setText($('snd'), s.sound ? 'On' : 'Off'); $('snd').setAttribute('aria-pressed', String(s.sound));
     setText($('mus'), s.music ? 'On' : 'Off'); $('mus').setAttribute('aria-pressed', String(s.music));
     setText($('hap'), s.haptics ? 'On' : 'Off'); $('hap').setAttribute('aria-pressed', String(s.haptics));
@@ -335,7 +444,7 @@ export function createUI(h) {
   function achList(s) {
     const shown = L.CHAINS.filter((c) => !L.chainHidden(s, c));
     if (achView === 'done') return shown.filter((c) => L.chainState(s, c).earnedCount > 0).sort(chainOrder);
-    if (achView === 'type') return L.CHAINS.slice().sort(chainOrder); // includes hidden secrets, drawn as "?" cards
+    if (achView === 'type') return shown.sort(chainOrder); // secret ones stay out of sight until they are earned
     return shown.filter((c) => !L.chainState(s, c).complete)
       .sort((x, y) => ratio(s, L.chainState(s, y).next) - ratio(s, L.chainState(s, x).next)).slice(0, 10);
   }
@@ -353,13 +462,6 @@ export function createUI(h) {
       if (grouped && chain.group !== lastGroup) {
         lastGroup = chain.group;
         const g = document.createElement('h3'); g.className = 'grp'; g.textContent = chain.group; host.appendChild(g);
-      }
-      if (L.chainHidden(s, chain)) {
-        // A secret one nobody has earned yet: a placeholder that gives nothing away.
-        const m = document.createElement('article'); m.className = 'card ach mystery';
-        m.innerHTML = '<div class="count">?</div><div class="info"><h3 class="name"><span class="nm">???</span><span class="tier secret">Secret</span></h3><p class="desc">Keep playing to discover it.</p></div>';
-        host.appendChild(m);
-        return;
       }
       const el = document.createElement('article'); el.className = 'card ach';
       el.innerHTML = '<div class="count"></div><div class="info"><h3 class="name"><span class="nm"></span><span class="tier"></span><span class="tier secret" hidden>Secret</span><span class="newpill" hidden>New</span></h3><p class="chainline"><span class="ctitle"></span><span class="pips"></span></p><p class="desc"></p><div class="track"><div class="fill"></div></div><p class="meta"></p><p class="earned"></p></div><button class="buy can" type="button" hidden><span class="bn">Claim</span><span class="bc"></span></button>';
@@ -389,7 +491,7 @@ export function createUI(h) {
   function updateAch(s) {
     const n = L.achCount(s), rank = L.rankFor(n), nextRank = RANKS.find((r) => r.min > n);
     if (achKey !== achView + '|' + n) buildAch(s);
-    setText($('achcount'), n + ' / ' + ACHS.length);
+    setText($('achcount'), L.secretsDone(s) ? n + ' / ' + ACHS.length : String(n)); // no total until every secret commendation is earned
     const all = L.pendingGifts(s), ab = $('ach-claim');
     ab.hidden = all.count < 2; // one waiting gift is claimed from its own card
     if (all.count >= 2) setText(ab, 'Claim all ' + all.count + ' rewards +' + L.fmt(all.ore));
@@ -493,8 +595,21 @@ export function createUI(h) {
     updateAch(s);
     if (goalsFocus) { const f = goalsFocus; goalsFocus = null; spotlightReward(s, f); }
   }
-  /** Scrolls to a commendation card and flashes it: the given chain's, or else the first with a reward waiting. */
+  /**
+   * Scrolls to a commendation reward and flashes it. A commendation that was asked for (f.chain, from its banner) is shown first.
+   * Otherwise, when several rewards are waiting, the "Claim all" button is the place to start; with just one, its card.
+   */
   function spotlightReward(s, f) {
+    const smooth = matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
+    if (!f.chain && L.pendingGifts(s).count >= 2) {
+      const all = $('ach-claim');
+      if (!all.hidden) {
+        all.scrollIntoView({ block: 'center', behavior: smooth });
+        all.classList.add('spot');
+        setTimeout(() => all.classList.remove('spot'), 1800);
+        return;
+      }
+    }
     const find = () => (f.chain ? achEls.find((e) => e.chain.id === f.chain) : achEls.find((e) => !e.btn.hidden));
     let e = find();
     if (!e && (f.chain || L.pendingGifts(s).count > 0)) { // the current view leaves it out: show every chain
@@ -504,7 +619,7 @@ export function createUI(h) {
       e = find();
     }
     if (!e) return; // nothing waiting: stay at the top, where the daily rewards are
-    e.root.scrollIntoView({ block: 'center', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+    e.root.scrollIntoView({ block: 'center', behavior: smooth });
     e.root.classList.add('spot');
     setTimeout(() => e.root.classList.remove('spot'), 1800);
   }
@@ -574,20 +689,23 @@ export function createUI(h) {
     ep.hidden = !evNow; if (evNow) { setText(ep, evNow.name); ep.title = evNow.desc; }
     const b = $('bonus'), bx = L.surveyMult(s) * L.achMult(s) * L.iapMult(s) - 1;
     if (bx >= 0.005) { b.hidden = false; setText(b, '+' + L.fmtPct(bx, 0) + ' bonus'); } else b.hidden = true;
+    const rl = h.retroLeft ? h.retroLeft() : 0, rp = $('retropill'); // 8-bit mode countdown
+    if (rl > 0) { rp.hidden = false; setText(rp, '8-BIT ' + Math.ceil(rl / 1000) + ' s'); } else rp.hidden = true;
     const fz = $('frenzy');
     if (L.frenzyOn(s, now)) { fz.hidden = false; setText(fz, '×' + FRENZY_MULT + ' for ' + Math.ceil(L.frenzyLeft(s, now)) + 's'); } else fz.hidden = true;
     updateOre(s);
     updateFleet(s); updatePod(s, date); updateUps(s);
     if (activeTab === 'goals') updateGoals(s, date);
     if (activeTab === 'shop') updateShop(s);
-    updateBelt(s);
+    updateBelt(s); updateCaptain(s);
     $('b-ups').hidden = !L.visibleUps(s).some((u) => s.ore >= u.cost);
     $('b-goals').hidden = !(L.goalsReady(s, date) || (freshAch.size > 0 && activeTab !== 'goals'));
-    $('b-belt').hidden = !(L.prestigeGain(s) >= 1 || L.journalCount(s) > s.journalSeen);
+    $('b-belt').hidden = !(L.prestigeGain(s) >= 1);
+    $('b-captain').hidden = !(L.journalCount(s) > s.journalSeen);
   }
 
   /* ---------- tabs and controls ---------- */
-  const TABS = ['fleet', 'ups', 'goals', 'shop', 'belt'];
+  const TABS = ['fleet', 'ups', 'goals', 'shop', 'belt', 'captain'];
   function selectTab(name) {
     if (activeTab === 'goals' && name !== 'goals') { freshAch.clear(); achKey = ''; } // seen now
     if (name === 'goals') achKey = ''; // rebuild so "Next up" is current
@@ -607,7 +725,7 @@ export function createUI(h) {
   }
 
   function init() {
-    buildFleet(); buildGoals(); buildShop();
+    buildFleet(); buildGoals(); buildShop(); buildSkins();
     document.querySelectorAll('#seg button').forEach((b) => b.addEventListener('click', () => {
       buyMode = b.dataset.m === 'max' ? 'max' : +b.dataset.m;
       document.querySelectorAll('#seg button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
@@ -635,6 +753,16 @@ export function createUI(h) {
       h.onRefresh();
     });
     $('journal-open').addEventListener('click', openJournal);
+    $('privacy').addEventListener('click', openPolicy);
+    $('policy-close').addEventListener('click', closePolicy);
+    document.querySelectorAll('.nav button').forEach((b) => b.insertAdjacentHTML('afterbegin', icon(b.dataset.tab)));
+    $('tut-next').addEventListener('click', () => { if (tutStep < TUTORIAL.length - 1) { tutStep++; renderTutorial(); } else closeTutorial(); });
+    $('tut-skip').addEventListener('click', closeTutorial);
+    $('howto').addEventListener('click', showTutorial);
+    document.querySelectorAll('#beltseg button').forEach((b) => b.addEventListener('click', () => {
+      if (b.dataset.v === beltView) return;
+      setBeltView(b.dataset.v); $('tab-belt').scrollTop = 0; // each view starts at the top
+    }));
     $('journal-close').addEventListener('click', closeJournal);
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeJournal(); });
     if (h.version) setText($('version'), h.version);
@@ -646,7 +774,7 @@ export function createUI(h) {
   }
 
   return {
-    init, update, updateOre, toast, achPop, closeJournal, closeOverlay, showWelcome, setWelcomeOffer, welcomeDoubled, welcomeOpen, showOffer, hideOffer, markNew, setShopVisible, setAdPrivacy: (on) => { $('adprivacy-row').hidden = !on; }, selectTab, resetUpgradeList, resetAchList,
+    init, update, updateOre, toast, achPop, closeJournal, closeOverlay, showTutorial, showWelcome, setWelcomeOffer, welcomeDoubled, welcomeOpen, showOffer, hideOffer, markNew, setShopVisible, setAdPrivacy: (on) => { $('adprivacy-row').hidden = !on; }, selectTab, resetUpgradeList, resetAchList,
     activeTab: () => activeTab,
   };
 }

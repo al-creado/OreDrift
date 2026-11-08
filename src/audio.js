@@ -2,8 +2,10 @@
 
 let actx = null;
 let enabled = true;
+let retro = false; // 8-bit mode: every effect is a square wave
 
 export function setSoundEnabled(on) { enabled = !!on; }
+export function setRetro(on) { retro = !!on; }
 
 /** The shared context (music uses it too). Created lazily, which must happen inside a user tap. */
 export function audioContext() {
@@ -43,7 +45,7 @@ export function blip(freq, dur, vol, type) {
   if (!a || voices >= MAX_VOICES) return;
   try {
     const o = a.createOscillator(), g = a.createGain(), t = a.currentTime, atk = Math.min(ATTACK, dur / 2);
-    o.type = type || 'triangle';
+    o.type = retro ? 'square' : (type || 'triangle');
     o.frequency.setValueAtTime(freq, t);
     g.gain.setValueAtTime(0.0001, t);
     g.gain.linearRampToValueAtTime(vol, t + atk);
@@ -51,6 +53,23 @@ export function blip(freq, dur, vol, type) {
     o.connect(g); g.connect(effectsBus(a));
     voices++;
     o.onended = () => { voices--; o.disconnect(); g.disconnect(); };
+    o.start(t); o.stop(t + dur);
+  } catch (e) { /* audio is optional */ }
+}
+
+/** A rubber-duck quack: a buzzy tone that slides down, run through a low-pass filter so it sounds like a horn, not a saw. */
+export function quack(vol = 0.06) {
+  const a = ctx();
+  if (!a || voices >= MAX_VOICES) return;
+  try {
+    const o = a.createOscillator(), f = a.createBiquadFilter(), g = a.createGain(), t = a.currentTime, dur = 0.14;
+    o.type = retro ? 'square' : 'sawtooth';
+    o.frequency.setValueAtTime(700, t); o.frequency.exponentialRampToValueAtTime(310, t + dur);
+    f.type = 'lowpass'; f.frequency.value = 1700; f.Q.value = 3;
+    g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(vol, t + 0.012); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(f); f.connect(g); g.connect(effectsBus(a));
+    voices++;
+    o.onended = () => { voices--; o.disconnect(); f.disconnect(); g.disconnect(); };
     o.start(t); o.stop(t + dur);
   } catch (e) { /* audio is optional */ }
 }
@@ -87,5 +106,12 @@ export const sounds = {
   // A supply ship is passing: a lower two-tone horn, then a soft double beep, so it sounds different from a comet.
   shipSpawn: () => chime([[330, 0.28, 0.05, 0], [440, 0.4, 0.05, 220]], 'triangle'),
   shipPing: () => chime([[660, 0.07, 0.03, 0], [660, 0.07, 0.03, 140]], 'triangle'),
+  // Rubber duck: it quacks twice when it appears, once now and then while it is on screen, and cheers when caught.
+  duckSpawn: () => { quack(); setTimeout(() => quack(0.05), 170); },
+  duckPing: () => quack(0.04),
+  duckCaught: () => { quack(0.07); setTimeout(() => quack(0.06), 130); chime([[784, 0.1, 0.05, 220], [1047, 0.16, 0.05, 310]], 'triangle'); },
+  // 8-bit mode switching on (a rising arpeggio) and off (a falling one).
+  retroOn: () => chime([[262, 0.09, 0.06, 0], [330, 0.09, 0.06, 80], [392, 0.09, 0.06, 160], [523, 0.09, 0.06, 240], [659, 0.18, 0.06, 320]], 'square'),
+  retroOff: () => chime([[659, 0.09, 0.05, 0], [523, 0.09, 0.05, 80], [392, 0.09, 0.05, 160], [262, 0.18, 0.05, 240]], 'triangle'),
   achievement: () => chime([[600, 0.12, 0.05, 0], [900, 0.2, 0.05, 100]]),
 };
