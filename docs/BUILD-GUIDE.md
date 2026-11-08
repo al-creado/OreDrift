@@ -1,6 +1,6 @@
 # Ore Drift: build and publish guide for Android
 
-> This started as the guide the project was built from. It was moved here from the repository's front-page README. Where it says "README.md", read "this file". **Updated Nov 2026 (version 1.4.0):** sections 3 to 5 and 8 to 11 now describe the game as it is today (15 upgrades, flyers, weekly missions, 72 commendations, skins, the relocate cost, the save format). Sections 1, 2, 6, 7 and 9 are still the original build instructions, with small corrections. For the current state of the project see the main [README](../README.md).
+> This started as the guide the project was built from. It was moved here from the repository's front-page README. Where it says "README.md", read "this file". **Updated Nov 2026 (version 0.5.0):** sections 3 to 5 and 8 to 11 now describe the game as it is today (15 upgrades, flyers, weekly missions, 72 commendations, skins, the relocate cost, the save format). Sections 1, 2, 6, 7 and 9 are still the original build instructions, with small corrections. For the current state of the project see the main [README](../README.md).
 
 Ore Drift is a space-mining idle clicker. You tap an asteroid, hire auto-miners, install upgrades, catch comets, finish daily missions, and relocate to richer belts for permanent bonuses.
 
@@ -377,7 +377,7 @@ cd android && ./gradlew bundleRelease
 # output: android/app/build/outputs/bundle/release/app-release.aab
 ```
 
-Increase `versionCode` in `android/app/build.gradle` for every upload (1, 2, 3...; it can never repeat). Set `versionName` to something like `1.4.0` and keep the `package.json` version the same, because Settings shows that one. Built APKs are named `ore-drift.apk`. Turn on Play App Signing when you create the app in Play Console; your keystore then only serves as the upload key.
+Increase `versionCode` in `android/app/build.gradle` for every upload (1, 2, 3...; it can never repeat). Set `versionName` to something like `0.5.0` while the app is in testing and `1.0.0` when it reaches production (only `versionCode` is checked by Play; the name is a label), and keep the `package.json` version the same, because Settings shows that one. Built APKs are named `ore-drift.apk`. Turn on Play App Signing when you create the app in Play Console; your keystore then only serves as the upload key.
 
 Never commit the keystore or its passwords.
 

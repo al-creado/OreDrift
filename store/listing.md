@@ -2,7 +2,7 @@
 
 Items marked **VERIFY** are things I could not confirm from the code or from Google's current rules. Check them in Play Console before you submit.
 
-Status (Nov 2026, version 1.4.0): the app is in closed testing. The Shop tab and Play Billing are **switched off** (`SHOP_ENABLED = false` in `src/main.js`), so the build contains ads but sells nothing yet. The live AdMob IDs are in the code.
+Status (Nov 2026, version 0.5.0, code 8): the app is in closed testing. The Shop tab and Play Billing are **switched off** (`SHOP_ENABLED = false` in `src/main.js`), so the build contains ads but sells nothing yet. The live AdMob IDs are in the code.
 
 ## App details
 - Name: **Ore Drift** (VERIFY: search Google Play for an existing app with the same or a confusingly close name)
