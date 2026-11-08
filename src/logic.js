@@ -782,5 +782,18 @@ export function noteCatchRun(S, run) {
 }
 
 /* ---------- the Captain's journal ---------- */
-export const journalUnlocked = (S) => JOURNAL.filter((c) => statValue(S, c.stat) >= c.t);
+/** The journal is read in order: a chapter opens when its own goal is met and every chapter before it is already open. */
+export function journalUnlocked(S) {
+  const open = [];
+  for (const c of JOURNAL) {
+    if (statValue(S, c.stat) < c.t) break;
+    open.push(c);
+  }
+  return open;
+}
 export const journalCount = (S) => journalUnlocked(S).length;
+/** What to show on a locked chapter: its own goal, or "Unlocks after chapter N." when its goal is met but an earlier chapter is still locked. */
+export function journalLockedReq(S, i) {
+  const c = JOURNAL[i];
+  return statValue(S, c.stat) >= c.t ? 'Unlocks after chapter ' + (journalCount(S) + 1) + '.' : c.req;
+}

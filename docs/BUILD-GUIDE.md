@@ -267,7 +267,7 @@ Costs are constants in `src/data.js` (`SKINS`).
   - Upgrades: one card per visible upgrade, plus "N installed, M left".
   - Goals: next event, supply drop, daily missions, weekly missions, daily cache, commendations (with Claim buttons for their ore gifts).
   - Belt: a switcher with three views. **Relocate** (survey points, the bonus you gain, what you lose, the Relocate button with a confirm tap), **Cosmetics** (skins, 3.14) and **Settings** (sound, music, vibration, how to play, reminders on Android, ad privacy choices when required, wipe save with a confirm tap, Privacy policy, version).
-  - Captain's log: the Captain's journal (10 chapters unlocking with lifetime ore) and the logbook of stats and rank.
+  - Captain's log: the Captain's journal (10 chapters that open strictly in order: each needs its own goal and every earlier chapter open) and the logbook of stats and rank.
   - Shop: optional purchases through Google Play.
 - **Overlays:** a four-card how-to-play (first launch, and again from Settings), the Captain's journal, the in-app privacy policy (the same text as the hosted page), the welcome-back summary, and the splash.
 - Buttons have a 44 to 48 px minimum touch size. Affordable buy buttons are filled orange, others outlined.

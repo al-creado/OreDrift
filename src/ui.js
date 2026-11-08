@@ -40,14 +40,14 @@ export function createUI(h) {
   function buildJournal(s, seen) {
     const host = $('jbody'); host.textContent = '';
     JOURNAL.forEach((c, i) => {
-      const open = L.statValue(s, c.stat) >= c.t;
+      const open = i < L.journalCount(s); // chapters open in order
       const el = document.createElement('article'); el.className = 'chapter' + (open ? '' : ' locked');
       const num = document.createElement('p'); num.className = 'jnum'; num.textContent = 'Chapter ' + (i + 1);
       const title = document.createElement('h3'); title.textContent = open ? c.title : 'Locked';
       if (open && i >= seen) { const n = document.createElement('span'); n.className = 'newpill'; n.textContent = 'New'; title.appendChild(n); }
       el.append(num, title);
       if (open) c.text.forEach((t) => { const p = document.createElement('p'); p.textContent = t; el.appendChild(p); });
-      else { const r = document.createElement('p'); r.className = 'jreq'; r.textContent = c.req; el.appendChild(r); }
+      else { const r = document.createElement('p'); r.className = 'jreq'; r.textContent = L.journalLockedReq(s, i); el.appendChild(r); }
       host.appendChild(el);
     });
   }

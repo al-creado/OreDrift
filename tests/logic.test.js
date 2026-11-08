@@ -1104,6 +1104,24 @@ describe("the Captain's journal", () => {
     expect(count({ allTime: 1e12 })).toBe(10);
   });
 
+  it('chapters open in order: a later goal met early does not open it', () => {
+    // 1 trillion lifetime ore meets chapter 10's goal, but only 2 relocations' worth of earlier goals are met
+    const S = state({ allTime: 1e12 });
+    expect(L.journalCount(S)).toBe(2);                                   // chapter 3 (catch a flyer) is still closed
+    expect(L.journalUnlocked(S).map((c) => c.id)).toEqual(['j1', 'j2']);
+    S.stats.comets = 1; S.runs = 1;                                        // chapters 3 to 5 open
+    expect(L.journalCount(S)).toBe(5);
+    S.runs = 5;                                                            // 6 needs 2 relocations, 9 needs 5: everything opens
+    expect(L.journalCount(S)).toBe(10);
+  });
+
+  it('a locked chapter says what it is waiting for', () => {
+    const S = state({ allTime: 1e12 });                                    // chapter 3 is the first locked one
+    expect(L.journalLockedReq(S, 2)).toBe(JOURNAL[2].req);                  // its own goal is not met yet
+    expect(L.journalLockedReq(S, 9)).toBe('Unlocks after chapter 3.');      // goal met, but blocked by chapter 3
+    expect(L.journalLockedReq(S, 8)).toBe(JOURNAL[8].req);                  // chapter 9 still needs 5 relocations
+  });
+
   it('keeps chapters unlocked after relocating', () => {
     const S = state({ allTime: 5e6, total: 5e6 });
     const before = L.journalCount(S);

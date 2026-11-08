@@ -98,6 +98,7 @@ function housekeeping(now) {
   if (earned.length) announceAch(earned);
   // A new chapter of the Captain's journal may have unlocked.
   const chapters = L.journalUnlocked(S);
+  S.journalSeen = Math.min(S.journalSeen, chapters.length); // chapters now open in order; never count one that is locked as seen
   if (knownChapters >= 0 && chapters.length > knownChapters) {
     const fresh = chapters.slice(knownChapters);
     ui.toast(fresh.length === 1 ? 'New journal entry: ' + fresh[0].title + '. Read it in the Captain\'s log.' : fresh.length + ' new journal entries. Read them in the Captain\'s log.', 4500);
