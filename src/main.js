@@ -316,7 +316,7 @@ function onClaimChest() {
 function onClaimSupply() {
   const r = L.claimSupply(S, new Date());
   if (!r) return;
-  ui.toast('Supply drop collected. +' + L.fmt(r.reward) + ' t. Streak: ' + r.streak + (r.streak === 1 ? ' day.' : ' days.'), 4000);
+  ui.toast('Supply drop collected. +' + L.fmt(r.reward) + ' t. Streak: ' + r.streak + (r.streak === 1 ? ' day.' : ' days.') + (r.bonusSec ? ' Week complete: output ×' + FRENZY_MULT + ' for ' + r.bonusSec + ' s!' : ''), 4500);
   sounds.supply();
   refresh(); save();
 }

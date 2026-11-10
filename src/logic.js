@@ -541,6 +541,21 @@ export const nextStreak = (S, date) => (S.lastSupply === prevDayKey(date) ? S.st
 export const shownStreak = (S, date) =>
   (S.lastSupply === dayKey(date) || S.lastSupply === prevDayKey(date) ? S.streak : 0);
 export const supplyFactor = (n) => 1 + 0.25 * (Math.min(n, 7) - 1);
+/** The seven squares restart every week of the streak. Day 7 of each week adds a short x7 boost on top of the drop. */
+export const SUPPLY_WEEK_BOOST_SECONDS = 60;
+/**
+ * Where the player is in the weekly cycle of the supply streak (the streak itself keeps counting).
+ * { week, filled, nextDay }: week = 1, 2, 3...; filled = squares lit now; nextDay = 1..7 for the drop that can be
+ * claimed today (null when today's is already claimed). A new week starts empty the day after day 7.
+ */
+export function supplyCycle(S, date) {
+  if (canSupply(S, date)) {
+    const n = nextStreak(S, date), nextDay = ((n - 1) % 7) + 1;
+    return { week: Math.floor((n - 1) / 7) + 1, filled: nextDay - 1, nextDay };
+  }
+  const n = S.streak;
+  return { week: Math.floor((n - 1) / 7) + 1, filled: ((n - 1) % 7) + 1, nextDay: null };
+}
 export function supplyReward(S, date) {
   const f = supplyFactor(nextStreak(S, date));
   return minutesOfOre(S, 15 * f, 600 * f);
@@ -588,7 +603,9 @@ export function claimSupply(S, date) {
   S.stats.best = Math.max(S.stats.best, streak);
   S.stats.drops++;
   gain(S, reward, true);
-  return { reward, streak };
+  const bonus = streak % 7 === 0; // day 7 of a week: an extra boost
+  if (bonus) startFrenzy(S, date.getTime(), SUPPLY_WEEK_BOOST_SECONDS);
+  return { reward, streak, bonusSec: bonus ? SUPPLY_WEEK_BOOST_SECONDS : 0 };
 }
 
 /* ---------- passing flyers: supply ships and comets ---------- */

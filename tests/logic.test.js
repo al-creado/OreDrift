@@ -501,11 +501,59 @@ describe('comets', () => {
 describe('supply drop', () => {
   const day1 = D(2026, 3, 10), day2 = D(2026, 3, 11), day4 = D(2026, 3, 13);
 
+  describe('weekly cycle', () => {
+    const day = (n) => D(2026, 3, 9 + n); // day(1) = 10 March
+    const cycleAfter = (claims) => { const S = state(); for (let i = 1; i <= claims; i++) L.claimSupply(S, day(i)); return S; };
+
+    it('the seven squares restart every week while the streak keeps counting', () => {
+      const S = state();
+      // before day 1: nothing lit, day 1 is next
+      expect(L.supplyCycle(S, day(1))).toEqual({ week: 1, filled: 0, nextDay: 1 });
+      L.claimSupply(S, day(1));
+      expect(L.supplyCycle(S, day(1))).toEqual({ week: 1, filled: 1, nextDay: null });   // claimed today
+      for (let i = 2; i <= 7; i++) L.claimSupply(S, day(i));
+      expect(S.streak).toBe(7);
+      expect(L.supplyCycle(S, day(7))).toEqual({ week: 1, filled: 7, nextDay: null });   // a full week, shown complete today
+      expect(L.supplyCycle(S, day(8))).toEqual({ week: 2, filled: 0, nextDay: 1 });      // the next day: a fresh week
+      L.claimSupply(S, day(8));
+      expect(S.streak).toBe(8);                                                            // the streak did not reset
+      expect(L.supplyCycle(S, day(8))).toEqual({ week: 2, filled: 1, nextDay: null });
+      for (let i = 9; i <= 14; i++) L.claimSupply(S, day(i));
+      expect(L.supplyCycle(S, day(14))).toEqual({ week: 2, filled: 7, nextDay: null });
+      expect(L.supplyCycle(S, day(15))).toEqual({ week: 3, filled: 0, nextDay: 1 });
+    });
+
+    it('missing a day starts over at week 1, day 1', () => {
+      const S = cycleAfter(9);                                                             // day 9: week 2
+      expect(L.supplyCycle(S, day(11))).toEqual({ week: 1, filled: 0, nextDay: 1 });       // skipped day 10
+      expect(L.claimSupply(S, day(11)).streak).toBe(1);
+    });
+
+    it('day 7 of every week adds a 60 s x7 boost, the other days do not', () => {
+      const S = state();
+      for (let i = 1; i <= 6; i++) { const r = L.claimSupply(S, day(i)); expect(r.bonusSec).toBe(0); }
+      expect(S.frenzyUntil).toBe(0);
+      const r7 = L.claimSupply(S, day(7));
+      expect(r7.bonusSec).toBe(60);
+      expect(S.frenzyUntil).toBe(day(7).getTime() + 60000);
+      expect(L.claimSupply(S, day(8)).bonusSec).toBe(0);
+      for (let i = 9; i <= 13; i++) L.claimSupply(S, day(i));
+      const r14 = L.claimSupply(S, day(14));
+      expect(r14.bonusSec).toBe(60);                                                       // the second week's day 7 too
+    });
+
+    it('nobody gets a pay cut: after week 1 every drop pays the top rate', () => {
+      const S = cycleAfter(7);
+      expect(L.supplyReward(S, day(8))).toBe(L.supplyReward(state({ streak: 6, lastSupply: '2026-03-15' }), day(7))); // x2.5 both
+      expect(L.supplyFactor(L.nextStreak(S, day(8)))).toBe(2.5);
+    });
+  });
+
   it('first claim starts a streak of 1 and pays x1', () => {
     const S = state();
     expect(L.canSupply(S, day1)).toBe(true);
     const r = L.claimSupply(S, day1);
-    expect(r).toEqual({ reward: 600, streak: 1 });
+    expect(r).toEqual({ reward: 600, streak: 1, bonusSec: 0 });
     expect(S).toMatchObject({ streak: 1, lastSupply: '2026-03-10', ore: 600 });
     expect(S.stats.best).toBe(1);
   });

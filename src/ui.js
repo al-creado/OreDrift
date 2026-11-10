@@ -534,12 +534,13 @@ export function createUI(h) {
   }
   function updateGoals(s, date) {
     const D = s.daily; if (!D) return;
-    const sh = L.shownStreak(s, date), can = L.canSupply(s, date), nx = Math.min(L.nextStreak(s, date), 7), f = L.supplyFactor(L.nextStreak(s, date));
-    G.dots.forEach((d, i) => { d.classList.toggle('on', i < Math.min(sh, 7)); d.classList.toggle('next', can && i === nx - 1); });
-    $('dots').setAttribute('aria-label', 'Supply streak: ' + sh + ' of 7 days');
+    const can = L.canSupply(s, date), cyc = L.supplyCycle(s, date), f = L.supplyFactor(L.nextStreak(s, date));
+    G.dots.forEach((d, i) => { d.classList.toggle('on', i < cyc.filled); d.classList.toggle('next', can && i === cyc.nextDay - 1); });
+    $('dots').setAttribute('aria-label', 'Supply streak, week ' + cyc.week + ': ' + cyc.filled + ' of 7 days');
+    setText($('supweek'), 'Week ' + cyc.week);
     setText($('supnote'), can
-      ? 'Day ' + nx + ' pays ×' + f + ', about ' + L.fmt(L.supplyReward(s, date)) + ' t. Miss a day and the streak starts over.'
-      : 'Collected for today. Streak: ' + s.streak + (s.streak === 1 ? ' day. ' : ' days. ') + (s.streak >= 7 ? 'Bonus is at its maximum.' : 'Come back tomorrow for a bigger drop.'));
+      ? 'Day ' + cyc.nextDay + ' pays ×' + f + (cyc.week > 1 ? ' (the top rate)' : '') + ', about ' + L.fmt(L.supplyReward(s, date)) + ' t' + (cyc.nextDay === 7 ? ', plus a ' + L.SUPPLY_WEEK_BOOST_SECONDS + '\u00a0s ×' + FRENZY_MULT + ' boost' : '') + '. Miss a day and the streak starts over.'
+      : 'Collected for today. Streak: ' + s.streak + (s.streak === 1 ? ' day. ' : ' days. ') + (cyc.filled === 7 ? 'Week ' + cyc.week + ' complete! A new week starts tomorrow.' : cyc.week > 1 || s.streak >= 6 ? 'Day 7 of each week adds a ' + L.SUPPLY_WEEK_BOOST_SECONDS + '\u00a0s ×' + FRENZY_MULT + ' boost.' : 'Come back tomorrow for a bigger drop.'));
     const ev = L.activeEvent(date), nx_ = ev ? null : L.nextEvent(date), es = $('event-sect');
     es.classList.toggle('on', !!ev);
     if (ev) { setText($('ev-name'), ev.name); setText($('ev-time'), 'Ends in ' + leftText(ev.endsAt - date.getTime())); setText($('ev-desc'), ev.desc); }
