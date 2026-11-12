@@ -183,6 +183,7 @@ A timed x7 multiplier on both ore/s and tap value. Starting a frenzy extends the
 - Streak: claiming the day after the previous claim continues it (`streak + 1`). Missing a day restarts at 1.
 - Reward: `max(600*f, ops(no frenzy) * 60 * 15 * f)` where `f = 1 + 0.25 * (min(streakDay, 7) - 1)`. So day 1 pays x1 and day 7 onward pays x2.5.
 - **Weekly cycle:** the streak keeps counting (for the commendations), but the seven squares restart every week: day `((streak - 1) mod 7) + 1`, shown with a "Week N" label. After day 7 the next day starts a fresh, empty week. The pay does not drop: after week 1 every drop pays the top rate (x2.5).
+- **Streak flame:** a flame with the current streak count sits on the supply drop card. Its colour steps at 7, 14, 30, 60 and 100 days (orange, orange-red, rose, purple, glowing blue, pale gold). A line under the note names the next streak skin and the player's best streak.
 - **Day 7 bonus:** the 7th day of every week (streak 7, 14, 21...) also starts a 60 second x7 boost (stacking with any boost already running, up to the usual cap).
 - UI: seven numbered squares. Filled squares are the days of the current week. The square for today's claim has an outline.
 
@@ -248,6 +249,7 @@ Skins change how the game looks and nothing else. They are bought with spare sur
 - **Fleet paint** (5): Midnight, Copper, Emerald (4 each), Crimson (6), Gold fleet (10).
 - **Sky** (4): Warm stars (3), Aurora, Violet nebula and Deep blue (6 each, with a coloured glow behind the asteroid).
 Costs are constants in `src/data.js` (`SKINS`).
+- **Streak skins** (5, not for sale): Ember night (sky, 7 days), Afterburner (fleet, 14), Cinder (asteroid, 30), Blue flame (fleet, 60), Eternal flame (asteroid, 100). They unlock for good once the **best** supply streak (`stats.best`) reaches the day, so a broken streak never takes one away. They show in the Cosmetics list as locked ("Reach a 14-day supply streak. Your best: 9.") until earned, and claiming the day that reaches a milestone shows a toast.
 
 ### 3.15 Easter eggs
 

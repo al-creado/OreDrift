@@ -317,6 +317,7 @@ function onClaimSupply() {
   const r = L.claimSupply(S, new Date());
   if (!r) return;
   ui.toast('Supply drop collected. +' + L.fmt(r.reward) + ' t. Streak: ' + r.streak + (r.streak === 1 ? ' day.' : ' days.') + (r.bonusSec ? ' Week complete: output ×' + FRENZY_MULT + ' for ' + r.bonusSec + ' s!' : ''), 4500);
+  if (r.unlocked.length) ui.toast('Streak reward! New skin: ' + r.unlocked.map((k) => k.name).join(', ') + '. Wear it under Belt, Cosmetics.', 6000);
   sounds.supply();
   refresh(); save();
 }

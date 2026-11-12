@@ -6,7 +6,7 @@
 import {
   GENS, UPS, ACHS, MILESTONES, GROWTH, OFFLINE_CAP, OFFLINE_RATE, PRESTIGE_BASE, PRESTIGE_GROWTH_DIV, PRESTIGE_GROWTH_POW,
   FRENZY_MULT, FRENZY_MAX_MS, SKINS, ACH_BONUS, ACH_GIFT, RANKS, CHAIN_TITLES, JOURNAL, SURVEY_BONUS, MAX_BUY, MISSION_TYPES, TAP_TARGETS,
-  PRODUCTS, BOOST_MULT, GRANTED_KEEP,
+  PRODUCTS, BOOST_MULT, GRANTED_KEEP, STREAK_TIERS,
 } from './data.js';
 
 /* ---------- random ---------- */
@@ -245,16 +245,26 @@ export function relocate(S) {
 export const skinById = (id) => SKINS.find((k) => k.id === id) || null;
 /** Survey points free to spend. The survey bonus itself uses S.power, so spending points never lowers it. */
 export const spendablePoints = (S) => Math.max(0, S.points - S.spent);
-export const owns_skin = (S, id) => S.skins[id] === true;
+/** True when the skin is bought, or (for a streak reward) the best supply streak has reached its day. */
+export function owns_skin(S, id) {
+  const k = skinById(id);
+  return !!k && (S.skins[id] === true || (k.streak !== undefined && S.stats.best >= k.streak));
+}
+/** The streak rewards earned when the best streak went from `prev` to `now` days. */
+export const streakSkinsBetween = (prev, now) => SKINS.filter((k) => k.streak !== undefined && k.streak > prev && k.streak <= now);
+/** The next streak reward still to earn, or null when all are unlocked. */
+export const nextStreakSkin = (S) => SKINS.filter((k) => k.streak !== undefined && k.streak > S.stats.best).sort((a, b) => a.streak - b.streak)[0] || null;
+/** 0 for a streak under the first milestone, then 1 to 5: how many milestones the streak has reached (the flame's colour). */
+export const streakTier = (n) => STREAK_TIERS.filter((t) => n >= t).length;
 /** The skin worn in a slot, or null for the default look. */
 export const wornSkin = (S, slot) => {
   const k = skinById(S.look[slot]);
-  return k && k.slot === slot && S.skins[k.id] ? k : null;
+  return k && k.slot === slot && owns_skin(S, k.id) ? k : null;
 };
 /** Buys a skin with spare survey points and wears it. Mutates S. Returns false when refused. */
 export function buySkin(S, id) {
   const k = skinById(id);
-  if (!k || S.skins[id] || spendablePoints(S) < k.cost) return false;
+  if (!k || k.streak !== undefined || S.skins[id] || spendablePoints(S) < k.cost) return false; // streak rewards cannot be bought
   S.spent += k.cost; S.skins[id] = true; S.look[k.slot] = id;
   return true;
 }
@@ -262,7 +272,7 @@ export function buySkin(S, id) {
 export function wearSkin(S, slot, id) {
   if (id === '') { S.look[slot] = ''; return true; }
   const k = skinById(id);
-  if (!k || k.slot !== slot || !S.skins[id]) return false;
+  if (!k || k.slot !== slot || !owns_skin(S, id)) return false;
   S.look[slot] = id;
   return true;
 }
@@ -597,7 +607,7 @@ export function claimChest(S, now) {
 /** Mutates S. Returns { reward, streak } or null if already claimed today. */
 export function claimSupply(S, date) {
   if (!canSupply(S, date)) return null;
-  const reward = supplyReward(S, date), streak = nextStreak(S, date);
+  const reward = supplyReward(S, date), streak = nextStreak(S, date), prevBest = S.stats.best;
   S.streak = streak;
   S.lastSupply = dayKey(date);
   S.stats.best = Math.max(S.stats.best, streak);
@@ -605,7 +615,7 @@ export function claimSupply(S, date) {
   gain(S, reward, true);
   const bonus = streak % 7 === 0; // day 7 of a week: an extra boost
   if (bonus) startFrenzy(S, date.getTime(), SUPPLY_WEEK_BOOST_SECONDS);
-  return { reward, streak, bonusSec: bonus ? SUPPLY_WEEK_BOOST_SECONDS : 0 };
+  return { reward, streak, bonusSec: bonus ? SUPPLY_WEEK_BOOST_SECONDS : 0, unlocked: streakSkinsBetween(prevBest, S.stats.best) };
 }
 
 /* ---------- passing flyers: supply ships and comets ---------- */

@@ -10,6 +10,8 @@ const PATHS = {
   belt: '<circle cx="12" cy="12" r="5"/><ellipse cx="12" cy="12" rx="10" ry="3.4" transform="rotate(-20 12 12)"/>',
   // a logbook with a bookmark
   captain: '<path d="M6.5 3.5h10.5a1.5 1.5 0 0 1 1.5 1.5v14.5H8A1.5 1.5 0 0 0 6.5 21V3.5z"/><path d="M6.5 18.2A1.5 1.5 0 0 1 8 16.7h10.5"/><path d="M10 8h5"/><path d="M10 11h3.5"/>',
+  // a flame
+  flame: '<path d="M12 2.6c.9 3.1 4.6 5.2 4.6 9.5a4.6 4.6 0 0 1-9.2 0c0-1.9.9-3.3 1.8-4.2.1 1.4.8 2.2 1.7 2.4C10.2 7.4 10.5 4.7 12 2.6z"/>',
   // a bag
   shop: '<path d="M5 8h14l-1.1 12H6.1L5 8z"/><path d="M9 8V6.4a3 3 0 0 1 6 0V8"/>',
   // an asteroid with a tap ripple

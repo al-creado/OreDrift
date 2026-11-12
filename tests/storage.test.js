@@ -129,6 +129,12 @@ describe('parseSave', () => {
     expect(fresh(NOW).tutorial).toBe(false);
   });
 
+  it('a streak skin can be worn from a save only if the best streak has earned it', () => {
+    const base = { ...goodSave(), stats: { best: 6 }, look: { rock: '', fleet: '', sky: 'sky_ember' } };
+    expect(parse(base).look.sky).toBe('');                                          // best streak 6 < 7: not earned
+    expect(parse({ ...base, stats: { best: 7 } }).look.sky).toBe('sky_ember');       // earned, so it stays worn
+  });
+
   it('8-bit mode count is read, and an older save has none', () => {
     expect(parse({ ...goodSave(), stats: { retro: 3 } }).stats.retro).toBe(3);
     expect(parse({ ...goodSave(), stats: { retro: -2 } }).stats.retro).toBe(0);

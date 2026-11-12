@@ -5,7 +5,7 @@
 import { Capacitor } from '@capacitor/core';
 import { Preferences } from '@capacitor/preferences';
 import { GENS, UPS, ACHS, MISSION_TYPES, GRANTED_KEEP, JOURNAL, SKINS } from './data.js';
-import { fresh, WEEKLY_TYPES } from './logic.js';
+import { fresh, WEEKLY_TYPES, owns_skin } from './logic.js';
 
 export const SAVE_KEY = 'oredrift.v1';
 const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -56,11 +56,6 @@ export function parseSave(raw, now = Date.now()) {
   S.spent = Math.min(int(d.spent, 0), S.points); // can never have spent more than was earned
   const skins = isObj(d.skins) ? d.skins : {};
   for (const k of SKINS) if (skins[k.id] === true) S.skins[k.id] = true;
-  const look = isObj(d.look) ? d.look : {};
-  for (const slot of Object.keys(S.look)) {
-    const k = SKINS.find((x) => x.id === look[slot]);
-    if (k && k.slot === slot && S.skins[k.id]) S.look[slot] = k.id; // only an owned skin of the right slot can be worn
-  }
   const gifts = isObj(d.gifts) ? d.gifts : {};
   for (const a of ACHS) {
     const g = num(gifts[a.id], -1);
@@ -74,6 +69,11 @@ export function parseSave(raw, now = Date.now()) {
     night: int(st.night, 0), bare: int(st.bare, 0), bestRun: int(st.bestRun, 0), overdrive: int(st.overdrive, 0), ducks: int(st.ducks, 0), retro: int(st.retro, 0),
     played: Math.max(0, num(st.played, 0)), peak: Math.max(0, num(st.peak, 0)),
   };
+  const look = isObj(d.look) ? d.look : {};
+  for (const slot of Object.keys(S.look)) {
+    const k = SKINS.find((x) => x.id === look[slot]);
+    if (k && k.slot === slot && owns_skin(S, k.id)) S.look[slot] = k.id; // only an owned skin of the right slot can be worn (a streak reward counts once the best streak has earned it)
+  }
   S.stats.ships = Math.min(S.stats.ships, S.stats.comets); // supply ships are a subset of all flyers caught
   S.streak = int(d.streak, 0);
   S.lastSupply = typeof d.lastSupply === 'string' && DAY_RE.test(d.lastSupply) ? d.lastSupply : '';

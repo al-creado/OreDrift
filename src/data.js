@@ -222,7 +222,10 @@ export const GRANTED_KEEP = 50;
  * bonus (a separate number, S.power) is untouched, and spending only moves points from "to spend" to "spent".
  * slot: where it applies. rock skins either borrow a belt's colour scheme (belt: index into BELTS) or bring their own.
  * An empty look id ('') is the default for that slot.
+ * A skin with `streak: N` is not for sale: it unlocks for good once the player's best supply streak reaches N days.
  */
+/** Streak milestones (days): the flame changes colour at each, and each has a streak-only skin. */
+export const STREAK_TIERS = [7, 14, 30, 60, 100];
 export const SKIN_SLOTS = [
   { id: 'rock', name: 'Asteroid', note: 'Recolours the rock and its glowing veins. The shape still follows your belt.' },
   { id: 'fleet', name: 'Fleet paint', note: 'The hull colours of your orbiting vessels.' },
@@ -251,6 +254,13 @@ export const SKINS = [
   { id: 'sky_aurora', slot: 'sky', name: 'Aurora', cost: 6, sky: { star: '#c9fff0', nebula: '#2bd9a3' } },
   { id: 'sky_nebula', slot: 'sky', name: 'Violet nebula', cost: 6, sky: { star: '#f0d6ff', nebula: '#9b5de5' } },
   { id: 'sky_deep', slot: 'sky', name: 'Deep blue', cost: 6, sky: { star: '#d6e8ff', nebula: '#3a6fff' } },
+
+  // Streak rewards: earned with the daily supply streak, never bought.
+  { id: 'sky_ember', slot: 'sky', name: 'Ember night', streak: 7, sky: { star: '#ffd0a0', nebula: '#ff7a3d' } },
+  { id: 'fleet_afterburner', slot: 'fleet', name: 'Afterburner', streak: 14, paint: { hull: '#ffd9a8', mid: '#ff7a3d', dark: '#8a2b0f' } },
+  { id: 'rock_cinder', slot: 'rock', name: 'Cinder', streak: 30, colors: { rock: '#2a1c1c', light: '#8a4b3a', vein: '#ff6a2b', veinHi: '#ffd2a0' } },
+  { id: 'fleet_blueflame', slot: 'fleet', name: 'Blue flame', streak: 60, paint: { hull: '#e0f8ff', mid: '#4cc9f0', dark: '#1b5a7a' } },
+  { id: 'rock_eternal', slot: 'rock', name: 'Eternal flame', streak: 100, colors: { rock: '#1e1b2e', light: '#6b5fa5', vein: '#fff3b0', veinHi: '#ffffff' } },
 ];
 
 

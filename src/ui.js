@@ -304,7 +304,7 @@ export function createUI(h) {
         el.querySelector('.sw').style.background = swatch(k.id ? k : null);
         el.querySelector('.nm').textContent = k.name;
         const c = { skin: k, meta: el.querySelector('.meta'), btn: el.querySelector('.buy'), bn: el.querySelector('.bn'), bc: el.querySelector('.bc') };
-        c.btn.addEventListener('click', () => { if (!k.id || L.owns_skin(S(), k.id)) h.onWearSkin(slot.id, k.id); else h.onBuySkin(k.id); });
+        c.btn.addEventListener('click', () => { if (!k.id || L.owns_skin(S(), k.id)) h.onWearSkin(slot.id, k.id); else if (k.streak === undefined) h.onBuySkin(k.id); });
         list.appendChild(el); skinEls.push(c);
       });
     });
@@ -312,13 +312,15 @@ export function createUI(h) {
   function updateSkins(s) {
     const spare = L.spendablePoints(s);
     setText($('skin-pts'), String(spare));
-    setText($('skin-note'), 'Skins are bought with survey points, 1 for every relocation. They only change how the game looks, and spending points never lowers your bonus.');
+    setText($('skin-note'), 'Skins are bought with survey points, 1 for every relocation, or earned with a daily supply streak. They only change how the game looks, and spending points never lowers your bonus.');
     skinEls.forEach((c) => {
       const k = c.skin, worn = k.id ? L.wornSkin(s, k.slot) === k : !L.wornSkin(s, k.slot);
       const owned = !k.id || L.owns_skin(s, k.id);
-      setText(c.meta, owned ? (k.meta || 'Owned') : 'Costs ' + k.cost + ' survey point' + (k.cost === 1 ? '' : 's'));
+      const streakSkin = k.streak !== undefined;
+      setText(c.meta, owned ? (k.meta || (streakSkin ? 'Streak reward: ' + k.streak + ' days' : 'Owned')) : streakSkin ? 'Reach a ' + k.streak + '-day supply streak. Your best: ' + s.stats.best + '.' : 'Costs ' + k.cost + ' survey point' + (k.cost === 1 ? '' : 's'));
       if (worn) setBtn(c, false, 'Worn', '');
       else if (owned) setBtn(c, true, 'Wear', '');
+      else if (streakSkin) setBtn(c, false, 'Locked', k.streak + ' days');
       else setBtn(c, spare >= k.cost, 'Buy', k.cost + ' survey pt' + (k.cost === 1 ? '' : 's'));
     });
   }
@@ -538,6 +540,14 @@ export function createUI(h) {
     G.dots.forEach((d, i) => { d.classList.toggle('on', i < cyc.filled); d.classList.toggle('next', can && i === cyc.nextDay - 1); });
     $('dots').setAttribute('aria-label', 'Supply streak, week ' + cyc.week + ': ' + cyc.filled + ' of 7 days');
     setText($('supweek'), 'Week ' + cyc.week);
+    const run = L.shownStreak(s, date), fl = $('supflame'), tier = L.streakTier(run);
+    fl.hidden = run < 1;
+    if (run >= 1) {
+      if (fl.dataset.n !== String(run)) { fl.dataset.n = String(run); fl.innerHTML = icon('flame', 18) + '<span>' + run + '</span>'; }
+      fl.dataset.tier = String(tier); fl.title = run + '-day streak'; fl.setAttribute('aria-label', run + '-day streak');
+    }
+    const nk = L.nextStreakSkin(s);
+    setText($('supskin'), nk ? 'Next streak skin: ' + nk.name + ' at ' + nk.streak + ' days. Your best: ' + s.stats.best + '.' : 'Every streak skin is unlocked.');
     setText($('supnote'), can
       ? 'Day ' + cyc.nextDay + ' pays ×' + f + (cyc.week > 1 ? ' (the top rate)' : '') + ', about ' + L.fmt(L.supplyReward(s, date)) + ' t' + (cyc.nextDay === 7 ? ', plus a ' + L.SUPPLY_WEEK_BOOST_SECONDS + '\u00a0s ×' + FRENZY_MULT + ' boost' : '') + '. Miss a day and the streak starts over.'
       : 'Collected for today. Streak: ' + s.streak + (s.streak === 1 ? ' day. ' : ' days. ') + (cyc.filled === 7 ? 'Week ' + cyc.week + ' complete! A new week starts tomorrow.' : cyc.week > 1 || s.streak >= 6 ? 'Day 7 of each week adds a ' + L.SUPPLY_WEEK_BOOST_SECONDS + '\u00a0s ×' + FRENZY_MULT + ' boost.' : 'Come back tomorrow for a bigger drop.'));

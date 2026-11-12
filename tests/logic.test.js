@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { GENS, UPS, ACHS, PRODUCTS, ACH_GROUPS, RANKS, JOURNAL, SKINS } from '../src/data.js';
+import { GENS, UPS, ACHS, PRODUCTS, ACH_GROUPS, RANKS, JOURNAL, SKINS, STREAK_TIERS } from '../src/data.js';
 import * as L from '../src/logic.js';
 import { simulate } from './sim.js';
 
@@ -501,6 +501,59 @@ describe('comets', () => {
 describe('supply drop', () => {
   const day1 = D(2026, 3, 10), day2 = D(2026, 3, 11), day4 = D(2026, 3, 13);
 
+  describe('streak skins', () => {
+    const day = (n) => D(2026, 3, 9 + n);
+    const streakSkins = SKINS.filter((k) => k.streak !== undefined);
+
+    it('there is one streak skin per milestone: 7, 14, 30, 60 and 100 days', () => {
+      expect(STREAK_TIERS).toEqual([7, 14, 30, 60, 100]);
+      expect(streakSkins.map((k) => k.streak)).toEqual([7, 14, 30, 60, 100]);
+      expect(new Set(streakSkins.map((k) => k.slot)).size).toBe(3);        // they spread over rock, fleet and sky
+      for (const k of streakSkins) expect(k.cost).toBeUndefined();         // never for sale
+    });
+    it('the flame colour steps at each milestone', () => {
+      expect([0, 1, 6, 7, 13, 14, 29, 30, 59, 60, 99, 100, 500].map(L.streakTier)).toEqual([0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5]);
+    });
+    it('a streak skin is owned once the best streak reaches its day, and stays owned', () => {
+      const S = state();
+      expect(L.owns_skin(S, 'sky_ember')).toBe(false);
+      S.stats.best = 6; expect(L.owns_skin(S, 'sky_ember')).toBe(false);
+      S.stats.best = 7; expect(L.owns_skin(S, 'sky_ember')).toBe(true);
+      expect(L.owns_skin(S, 'fleet_afterburner')).toBe(false);
+      S.streak = 0;                                                          // the streak broke; the best is still 7
+      expect(L.owns_skin(S, 'sky_ember')).toBe(true);
+    });
+    it('cannot be bought, but can be worn once earned', () => {
+      const S = state({ points: 50, power: 50 });
+      expect(L.buySkin(S, 'sky_ember')).toBe(false);
+      expect(L.wearSkin(S, 'sky', 'sky_ember')).toBe(false);                 // not earned yet
+      S.stats.best = 7;
+      expect(L.wearSkin(S, 'sky', 'sky_ember')).toBe(true);
+      expect(L.wornSkin(S, 'sky').id).toBe('sky_ember');
+      expect(S.spent).toBe(0);                                               // no points were spent
+    });
+    it('claiming the day that reaches a milestone reports the new skin, once', () => {
+      const S = state({ streak: 6, lastSupply: '2026-03-15' });
+      S.stats.best = 6;
+      const r = L.claimSupply(S, day(7));
+      expect(r.streak).toBe(7);
+      expect(r.unlocked.map((k) => k.id)).toEqual(['sky_ember']);
+      const next = L.claimSupply(S, day(8));
+      expect(next.unlocked).toEqual([]);                                     // already earned
+    });
+    it('a restarted streak earns nothing new, and the next skin is the next milestone', () => {
+      const S = state();
+      S.stats.best = 20;                                                     // earned 7 and 14 before
+      expect(L.nextStreakSkin(S).id).toBe('rock_cinder');
+      S.streak = 20; S.lastSupply = '2026-03-01';
+      const r = L.claimSupply(S, day(1));                                    // missed days: back to 1
+      expect(r.streak).toBe(1);
+      expect(r.unlocked).toEqual([]);
+      expect(S.stats.best).toBe(20);
+      S.stats.best = 100; expect(L.nextStreakSkin(S)).toBe(null);
+    });
+  });
+
   describe('weekly cycle', () => {
     const day = (n) => D(2026, 3, 9 + n); // day(1) = 10 March
     const cycleAfter = (claims) => { const S = state(); for (let i = 1; i <= claims; i++) L.claimSupply(S, day(i)); return S; };
@@ -553,7 +606,7 @@ describe('supply drop', () => {
     const S = state();
     expect(L.canSupply(S, day1)).toBe(true);
     const r = L.claimSupply(S, day1);
-    expect(r).toEqual({ reward: 600, streak: 1, bonusSec: 0 });
+    expect(r).toEqual({ reward: 600, streak: 1, bonusSec: 0, unlocked: [] });
     expect(S).toMatchObject({ streak: 1, lastSupply: '2026-03-10', ore: 600 });
     expect(S.stats.best).toBe(1);
   });
