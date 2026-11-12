@@ -267,7 +267,7 @@ Costs are constants in `src/data.js` (`SKINS`).
 - **Tabs (bottom nav, icons only, with accessible names):** Fleet (rocket), Upgrades (chevrons), Goals (trophy), Belt (ringed planet), Captain's log (logbook), and Shop (bag, hidden while `SHOP_ENABLED` is false). A small orange dot marks a tab with something ready.
   - Fleet: buy mode switch (x1, x10, Max) and one card per vessel.
   - Upgrades: one card per visible upgrade, plus "N installed, M left".
-  - Goals: next event, supply drop, daily missions, weekly missions, daily cache, commendations (with Claim buttons for their ore gifts).
+  - Goals: next event, supply drop, daily missions (with the daily cache as their bonus row at the bottom of the same card), weekly missions, commendations (with Claim buttons for their ore gifts).
   - Belt: a switcher with three views. **Relocate** (survey points, the bonus you gain, what you lose, the Relocate button with a confirm tap), **Cosmetics** (skins, 3.14) and **Settings** (sound, music, vibration, how to play, reminders on Android, ad privacy choices when required, wipe save with a confirm tap, Privacy policy, version).
   - Captain's log: the Captain's journal (10 chapters that open strictly in order: each needs its own goal and every earlier chapter open) and the logbook of stats and rank.
   - Shop: optional purchases through Google Play.

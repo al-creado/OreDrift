@@ -581,7 +581,7 @@ export function createUI(h) {
     $('weekly-sect').hidden = !W;
     const got = D.missions.filter((m) => m.claimed).length, all = got === 3, cr = L.chestReward(s);
     const md = $('mdone'); md.hidden = !all;
-    if (all) setText(md, 'All done for today. New missions arrive at midnight.');
+    if (all) setText(md, D.chest ? 'All done for today. New missions arrive at midnight.' : 'All three missions done. Open your cache below.');
     G.cache.forEach((d, i) => d.classList.toggle('on', i < got));
     $('cache-dots').hidden = D.chest; // once opened, the 1 2 3 give way to the countdown
     $('cache-time').hidden = !D.chest;
